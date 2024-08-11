@@ -25,7 +25,7 @@ app.listen(port,(req,res)=>{
 })
 
 //root path
-app.get("/",(req,res)=>{
+app.get("/AirBnb",(req,res)=>{
     res.send("success")
 })
 
