@@ -30,8 +30,8 @@ app.listen(port,(req,res)=>{
 })
 
 //root path
-app.get("/AirBnb",(req,res)=>{
-    res.send("success")
+app.get("/",(req,res)=>{
+    res.send("hello i am root")
 })
 
 app.get("/",(req,res)=>{
