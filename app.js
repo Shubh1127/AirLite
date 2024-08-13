@@ -76,11 +76,29 @@ app.get("/listings/:id/edit", async (req,res)=>{
 })
 
 //edit listing
-app.put("/listings/:id",async (req,res)=>{
-    let {id}=req.params;
-    await Listing.findByIdAndUpdate(id,{...req.body.listing});
-    res.redirect(`/listings/${id}`)
-})
+app.put("/listings/:id", async (req, res) => {
+    let { id } = req.params;
+    let updatedData = { ...req.body.listing };
+
+    // Ensure fields are handled as strings or other expected types
+    for (let key in updatedData) {
+        // If you have fields that are expected to be arrays, handle them differently.
+        // Here, we are treating fields as strings or other types.
+        if (Array.isArray(updatedData[key])) {
+            updatedData[key] = updatedData[key].join(', '); // Convert arrays to strings if needed
+        }
+    }
+
+    try {
+        await Listing.findByIdAndUpdate(id, updatedData, { new: true }); // { new: true } returns the updated document
+        res.redirect(`/listings/${id}`);
+    } catch (error) {
+        console.error(error);
+        res.status(400).send("Error updating listing");
+    }
+});
+
+
 //delete listing
 
 app.delete("/listings/:id", async (req,res)=>{
