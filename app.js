@@ -6,6 +6,7 @@ const method=require("method-override");
 const ejsMate=require("ejs-mate")
 const wrapAsync=require("./utils/wrapAsync.js")
 const ExpressError=require("./utils/ExpressError.js")
+const listingSchema=require("./Schema.js")
 
 let app=express();
 let port=8080;
@@ -51,12 +52,19 @@ app.get("/listings/new", (req,res)=>{
 })
 
 
+const validateListing=(req,res,next)=>{
+let{error}=listingSchema.validate(req.body);
+if(error){
+    throw new ExpressError(400,error)
+}
+else{
+    next();
+}
+
+}
 //create listing
-app.post("/listings", wrapAsync(async (req,res ,next)=>{
+app.post("/listings",validateListing, wrapAsync(async (req,res ,next)=>{
     
-    if(!req.body.listing){
-        throw new ExpressError("400","Send valid data for listing")
-    }
     const newListing=new Listing(req.body.listing);
         await  newListing.save()
         res.redirect("/listings");
@@ -79,12 +87,10 @@ app.get("/listings/:id/edit", wrapAsync(async (req,res)=>{
 })
 )
 //edit listing
-app.put("/listings/:id", wrapAsync(async (req, res) => {
+app.put("/listings/:id",validateListing, wrapAsync(async (req, res) => {
     let { id } = req.params;
     let updatedData = { ...req.body.listing };
-    if(!req.body.listing){
-        throw new ExpressError("400","Send valid data for listing")
-    }
+   
 
     // Ensure fields are handled as strings or other expected types
     for (let key in updatedData) {
