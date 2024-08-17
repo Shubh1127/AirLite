@@ -1,4 +1,5 @@
 const Joi =require("joi");
+const { comment } = require("postcss");
 
     const listingSchema=Joi.object({
         listing:Joi.object({
@@ -12,3 +13,13 @@ const Joi =require("joi");
     })
 
     module.exports=listingSchema;
+
+   const reviewSchema=Joi.object({
+        review:Joi.object({
+            rating:Joi.number().required().min(1).max(5),
+            comment:Joi.string().required(),
+        }).required()
+
+    })
+
+    module.exports=reviewSchema;

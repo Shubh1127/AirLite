@@ -1,30 +1,75 @@
 <body>
-<% layout("/layouts/boilerplate")%>
-<div class="row mt-3">
-    <div class="col-8 offset-3">
-    <h3>Listing details: </h3>
-    </div>
-    <div class="card offset-3 col-6 show-card">
-        <img src="<%=listing.image%>" class="card-img-top show-img" alt="listing_image">
-        <div class="card-body">
-            <p class="card-text"><b><%=listing.title%></b><br>
-                <%=listing.description%><br>
-                &#8377;<%=listing.price.toLocaleString("en-IN")%><br>
-                <%=listing.location%><br>
-                <%=listing.country%><br>
-            </p>
-          </div>
-    </div>
-    
-    <br>
-    <div class="btns">
+    <% layout("/layouts/boilerplate")%>
+        <div class="row mt-3">
+            <div class="col-8 offset-3">
+                <h3><b>
+                        <%=listing.title%>
+                    </b></h3>
+            </div>
+            <div class="card offset-3 col-6 show-card">
+                <img src="<%=listing.image%>" class="card-img-top show-img" alt="listing_image">
+                <div class="card-body">
+                    <p class="card-text">
+                    <p>
+                        <%=listing.description%>
+                    </p><br>
+                    &#8377;<%=listing.price.toLocaleString("en-IN")%><br>
+                        <%=listing.location%><br>
+                            <%=listing.country%><br>
+                                </p>
+                </div>
+            </div>
 
-        <a href="/listings/<%= listing._id %>/edit" class="btn btn-dark col-1 offset-3 add-btn">Edit</a>
-        <br>
-        <br>
-        <form method="post" action="/listings/<%=listing._id%>?_method=DELETE">
-            <button class="btn btn-dark offset-5">Delete </button>
-        </form>
-    </div>
-</div>
+            <br>
+            <div class="btns">
+
+                <a href="/listings/<%= listing._id %>/edit" class="btn btn-dark col-1 offset-3 add-btn">Edit</a>
+                <br>
+                <br>
+                <form method="post" action="/listings/<%=listing._id%>?_method=DELETE">
+                    <button class="btn btn-dark offset-5">Delete </button>
+                </form>
+            </div>
+            <div class="col-8 offset-3">
+                <hr>
+                <h4>Leave a Review</h4>
+                <form method="post" class="mb-3 needs-validation" action="/listings/<%=listing._id%>/reviews"
+                    novalidate>
+                    <div class="mb-3 mt-3">
+                        <label for="rating" class="from-label">Rating</label>
+                        <input type="range" min="1" max="5" id="rating" name="review[rating]" class="form-range">
+                    </div>
+                    <div class="mb-3 mt-3">
+                        <label for="comment" class="form-label">comments</label>
+                        <textarea cols="30" class="form-control" rows="5" id="comment" name="review[comment]"
+                            required></textarea>
+                        <div class="invalid-feedback">
+                            Please add some comments for review
+                        </div>
+                    </div>
+                    <br>
+                    <button class="btn btn-outline-dark">Submit</button>
+                </form>
+                <hr>
+                <p><b>All Reviews</b></p>
+                <div class="row mb-3">
+                <% for( let review of listing.reviews){ %>
+                    <div class="card mb-3 col-5 me-3 ">
+                        <div class="card-body ">
+                            <h5 class="card-title">Shubham</h5>
+                            <p class="card-text">
+                                <%=review.comment%>
+                            </p>
+                            <p class="card-text">
+                                <%=review.rating%>
+                            </p>
+                        </div>
+                    </div>
+                    <% } %>
+                </div>   
+
+            </div>
+        </div>
+
+        <script src="js/script.js"></script>
 </body>
