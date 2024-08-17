@@ -8,7 +8,9 @@ const ejsMate=require("ejs-mate")
 const wrapAsync=require("./utils/wrapAsync.js")
 const ExpressError=require("./utils/ExpressError.js")
 const listingSchema=require("./Schema.js")
-const reviewSchema=require("./Schema.js")
+const reviewSchema=require("./Schema.js");
+const review = require("./models/review.js");
+const listings=require("./routes/listing.js")
 
 let app=express();
 let port=8080;
@@ -34,33 +36,6 @@ app.listen(port,(req,res)=>{
     console.log("app is listening to port ",port);
 })
 
-//root path
-app.get("/",(req,res)=>{
-    res.send("hello i am root")
-})
-
-//show all listings
-app.get("/listings",wrapAsync( async (req,res)=>{
-    let allListings= await Listing.find({});
-    res.render("./listings/index.ejs", { allListings })
-})
-);
-//add new listing
-app.get("/listings/new", (req,res)=>{
-    res.render("./listings/new.ejs")
-})
-
-
-const validateListing=(req,res,next)=>{
-let{error}=listingSchema.validate(req.body);
-if(error){
-    throw new ExpressError(400,error)
-}
-else{
-    next();
-}
-
-}
 const validateReview=(req,res,next)=>{
 let{error}=reviewSchema.validate(req.body);
 if(error){
@@ -72,67 +47,12 @@ else{
 }
 
 }
-//create listing
-app.post("/listings",validateListing, wrapAsync(async (req,res ,next)=>{
-    
-    const newListing=new Listing(req.body.listing);
-        await  newListing.save()
-        res.redirect("/listings");
-    
+//root path
+app.get("/",(req,res)=>{
+    res.send("hello i am root")
 })
-)
+app.use("/listings",listings)
 
-//show listing
-app.get("/listings/:id", wrapAsync(async (req,res)=>{
-    let {id}=req.params;
-    const listing= await Listing.findById(id).populate("reviews")
-    // console.log(listing.reviews);
-    res.render("./listings/show.ejs",{listing})
-})
-);
-
-app.get("/listings/:id/edit", wrapAsync(async (req,res)=>{
-    let {id}=req.params;
-    const listing=await Listing.findById(id);
-    res.render("./listings/edit.ejs",{listing})
-})
-)
-//edit listing
-app.put("/listings/:id",validateListing, wrapAsync(async (req, res) => {
-    let { id } = req.params;
-    let updatedData = { ...req.body.listing };
-   
-
-    // Ensure fields are handled as strings or other expected types
-    for (let key in updatedData) {
-        // If you have fields that are expected to be arrays, handle them differently.
-        // Here, we are treating fields as strings or other types.
-        if (Array.isArray(updatedData[key])) {
-            updatedData[key] = updatedData[key].join(', '); // Convert arrays to strings if needed
-        }
-    }
-
-    try {
-        await Listing.findByIdAndUpdate(id, updatedData, { new: true }); // { new: true } returns the updated document
-        res.redirect(`/listings/${id}`);
-    } catch (error) {
-        console.error(error);
-        res.status(400).send("Error updating listing");
-    }
-})
-);
-
-
-//delete listing
-
-app.delete("/listings/:id", wrapAsync(async (req,res)=>{
-    let {id}=req.params;
-    let listing=await Listing.findByIdAndDelete(id);
-    res.redirect("/listings");
-})
-
-
-);
 //REVIEWS
 //post route
 app.post("/listings/:id/reviews", validateReview ,wrapAsync(async (req,res)=>{
@@ -151,6 +71,14 @@ app.post("/listings/:id/reviews", validateReview ,wrapAsync(async (req,res)=>{
    res.redirect(`/listings/${listing._id}`)
 }));
 
+//delete review route
+app.delete("/listings/:id/reviews/:reviewId",wrapAsync(async (req,res)=>{
+    let {id,reviewId}=req.params;
+
+    await Listing.findByIdAndUpdate(id,{$pull:{reviews:reviewId}});
+    await Review.findByIdAndDelete(reviewId);
+    res.redirect(`/listings/${id}`)
+}))
 
 app.all("*",(req,res,next)=>{
     next(new ExpressError(404,"Page Not Found!"));

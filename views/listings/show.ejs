@@ -6,7 +6,7 @@
                         <%=listing.title%>
                     </b></h3>
             </div>
-            <div class="card offset-3 col-6 show-card">
+            <div class="card offset-3 col-6 show-card listing-card">
                 <img src="<%=listing.image%>" class="card-img-top show-img" alt="listing_image">
                 <div class="card-body">
                     <p class="card-text">
@@ -60,9 +60,12 @@
                             <p class="card-text">
                                 <%=review.comment%>
                             </p>
-                            <p class="card-text">
-                                <%=review.rating%>
+                            <p class="card-text bg mb-2">
+                                <%=review.rating%> Star
                             </p>
+                            <form method="post" action="/listings/<%= listing._id %>/reviews/<%= review._id %>?_method=DELETE">
+                                <button class="btn btn-sm btn-dark mb-2">Delete</button>
+                            </form>
                         </div>
                     </div>
                     <% } %>
