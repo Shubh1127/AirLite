@@ -1,16 +1,16 @@
 const express=require("express")
 const mongoose=require("mongoose");
-const Listing = require("./models/listing.js");
-const Review = require("./models/review.js");
+
 const path=require("path")
 const method=require("method-override");
 const ejsMate=require("ejs-mate")
-const wrapAsync=require("./utils/wrapAsync.js")
+
 const ExpressError=require("./utils/ExpressError.js")
-const listingSchema=require("./Schema.js")
-const reviewSchema=require("./Schema.js");
-const review = require("./models/review.js");
+
+
+
 const listings=require("./routes/listing.js")
+const reviews=require("./routes/reviews.js")
 
 let app=express();
 let port=8080;
@@ -32,61 +32,32 @@ main().then(()=>{
 .catch((err)=>{
     console.log(err)
 })
+
+
 app.listen(port,(req,res)=>{
     console.log("app is listening to port ",port);
 })
 
-const validateReview=(req,res,next)=>{
-let{error}=reviewSchema.validate(req.body);
-if(error){
-    let errMsg=error.details.map((el)=>el.message).join(",")
-    throw new ExpressError(400,errMsg)
-}
-else{
-    next();
-}
 
-}
+
 //root path
 app.get("/",(req,res)=>{
     res.send("hello i am root")
 })
+
+
+//listings & reviews
 app.use("/listings",listings)
+app.use("/listings/:id/reviews",reviews)
 
-//REVIEWS
-//post route
-app.post("/listings/:id/reviews", validateReview ,wrapAsync(async (req,res)=>{
-    let listing= await Listing.findById(req.params.id);
-    
-    let newReview =new Review(req.body.review)
-   
-
-    listing.reviews.push(newReview)
-
-
-    await newReview.save()
-   await  listing.save()
-
-   console.log("review was saved")
-   res.redirect(`/listings/${listing._id}`)
-}));
-
-//delete review route
-app.delete("/listings/:id/reviews/:reviewId",wrapAsync(async (req,res)=>{
-    let {id,reviewId}=req.params;
-
-    await Listing.findByIdAndUpdate(id,{$pull:{reviews:reviewId}});
-    await Review.findByIdAndDelete(reviewId);
-    res.redirect(`/listings/${id}`)
-}))
 
 app.all("*",(req,res,next)=>{
     next(new ExpressError(404,"Page Not Found!"));
 });
+
 
 app.use((err,req,res,next)=>{
     let {statusCode=500,message="Something went wrong!"}=err;
     res.status(statusCode).render("error.ejs",{err});
     // res.status(statusCode).send(message)
 })
-
