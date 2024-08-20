@@ -4,7 +4,7 @@ const session=require("express-session")
 const path=require("path")
 const method=require("method-override");
 const ejsMate=require("ejs-mate")
-
+const flash=require("connect-flash")
 const ExpressError=require("./utils/ExpressError.js")
 
 
@@ -19,6 +19,7 @@ const sessionOptions={
     cookie:{
         expires:Date.now()+7*24*60*60*1000,
         maxAge:7*24*60*60*1000,
+        htttpOnly:true,
     }
 }
 
@@ -26,7 +27,6 @@ const sessionOptions={
 let app=express();
 let port=8080;
 app.use(method("_method"));
-app.use(session(sessionOptions))
 
 app.set("view engine","ejs");
 app.set("views",path.join(__dirname,"views"))
@@ -57,6 +57,13 @@ app.get("/",(req,res)=>{
     res.send("hello i am root")
 })
 
+app.use(session(sessionOptions))
+app.use(flash());
+
+app.use((req,res,next)=>{
+    res.locals.success=req.flash("success");
+    next();
+})
 
 //listings & reviews
 app.use("/listings",listings)
