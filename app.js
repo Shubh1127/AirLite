@@ -6,11 +6,14 @@ const method=require("method-override");
 const ejsMate=require("ejs-mate")
 const flash=require("connect-flash")
 const ExpressError=require("./utils/ExpressError.js")
+const passport=require("passport");
+const LocalStrategy=require("passport-local")
+const User=require("./models/user.js");
 
 
-
-const listings=require("./routes/listing.js")
-const reviews=require("./routes/reviews.js")
+const listingRouter=require("./routes/listing.js")
+const reviewRouter=require("./routes/reviews.js")
+const userRouter=require("./routes/user.js")
 
 const sessionOptions={
     secret: "musupersecretcode",
@@ -60,6 +63,13 @@ app.get("/",(req,res)=>{
 app.use(session(sessionOptions))
 app.use(flash());
 
+app.use(passport.initialize())
+app.use(passport.session())
+passport.use(new LocalStrategy(User.authenticate()));
+
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+
 app.use((req,res,next)=>{
     res.locals.success=req.flash("success");
     res.locals.error=req.flash("error");
@@ -67,10 +77,19 @@ app.use((req,res,next)=>{
     next();
 })
 
-//listings & reviews
-app.use("/listings",listings)
-app.use("/listings/:id/reviews",reviews)
+// app.get("/demouser", async (req,res)=>{
+//     let fakeUser=new User({
+//         email:"Shubamsinghmor2312@gmail.com",
+//         username:"Shubh1127"
+//     })
+//    let registereduser= await User.register(fakeUser,"helloworld")
+//    res.send(registereduser)
+// })
 
+//listings & reviews
+app.use("/listings",listingRouter)
+app.use("/listings/:id/reviews",reviewRouter)
+app.use("/", userRouter)
 
 app.all("*",(req,res,next)=>{
     next(new ExpressError(404,"Page Not Found!"));
