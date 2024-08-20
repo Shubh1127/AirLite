@@ -20,7 +20,7 @@ const listingSchema = new Schema({
     reviews:[
         {
             type:Schema.Types.ObjectId,
-            ref:'review'
+            ref:'Review'
         }
     ]
 });
