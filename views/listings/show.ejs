@@ -11,6 +11,11 @@
                 <div class="card-body">
                     <p class="card-text">
                     <p>
+                       Owned by:  <i>
+                            <% listing.owner.forEach(function(owner) { %>
+                              <b><%= owner.username %></b><br>
+                            <% }); %>
+                          </i><br>
                         <%=listing.description%>
                     </p><br>
                     &#8377;<%=listing.price.toLocaleString("en-IN")%><br>
@@ -21,6 +26,7 @@
             </div>
 
             <br>
+            <% if (currUser && listing.owner.some(owner => owner._id.equals(currUser._id))) { %>
             <div class="btns">
 
                 <a href="/listings/<%= listing._id %>/edit" class="btn btn-dark col-1 offset-3 add-btn">Edit</a>
@@ -30,6 +36,7 @@
                     <button class="btn btn-dark offset-5">Delete </button>
                 </form>
             </div>
+            <% } %>
             <div class="col-8 offset-3">
                 <hr>
                 <h4>Leave a Review</h4>
