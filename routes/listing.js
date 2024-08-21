@@ -4,7 +4,7 @@ const Listing = require("../models/listing.js");
 const wrapAsync=require("../utils/wrapAsync.js")
 const {listingSchema}=require("../Schema.js")
 // const Review = require('../models/review.js'); // Adjust the path as needed
-const {isLoggedIn}=require("../middleware.js")
+const {isLoggedIn, isOwner}=require("../middleware.js")
 const ExpressError=require("../utils/ExpressError.js")
 
 
@@ -60,7 +60,7 @@ router.post("/",validateListing,isLoggedIn, wrapAsync(async (req,res ,next)=>{
 
 
 //edit listing
-router.get("/:id/edit", isLoggedIn,wrapAsync(async (req,res)=>{
+router.get("/:id/edit", isLoggedIn,isOwner,wrapAsync(async (req,res)=>{
     let {id}=req.params;
     const listing=await Listing.findById(id);
     if(!listing){
@@ -70,36 +70,34 @@ router.get("/:id/edit", isLoggedIn,wrapAsync(async (req,res)=>{
     res.render("./listings/edit.ejs",{listing})
 })
 )
-//update listing
-router.put("/:id",validateListing,isLoggedIn, wrapAsync(async (req, res) => {
-    let { id } = req.params;
-    let updatedData = { ...req.body.listing };
-   
+// Update listing route
+router.put("/:id", validateListing, isLoggedIn,isOwner, wrapAsync(async (req, res) => {
+    const { id } = req.params;
+    const updatedData = { ...req.body.listing };
 
     // Ensure fields are handled as strings or other expected types
     for (let key in updatedData) {
-        // If you have fields that are expected to be arrays, handle them differently.
-        // Here, we are treating fields as strings or other types.
         if (Array.isArray(updatedData[key])) {
             updatedData[key] = updatedData[key].join(', '); // Convert arrays to strings if needed
         }
     }
 
     try {
+        // Update the listing
         await Listing.findByIdAndUpdate(id, updatedData, { new: true }); // { new: true } returns the updated document
-        req.flash("success","Listing Updated!")
+        req.flash("success", "Listing Updated!");
         res.redirect(`/listings/${id}`);
     } catch (error) {
         console.error(error);
         res.status(400).send("Error updating listing");
     }
-})
-);
+}));
+
 
 
 //delete listing
 
-router.delete("/:id",isLoggedIn, wrapAsync(async (req,res)=>{
+router.delete("/:id",isLoggedIn,isOwner, wrapAsync(async (req,res)=>{
     let {id}=req.params;
     let listing=await Listing.findByIdAndDelete(id);
     console.log(listing)
