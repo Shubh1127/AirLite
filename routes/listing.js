@@ -7,7 +7,8 @@ const { listingSchema } = require("../Schema.js");
 const { isLoggedIn, isOwner } = require("../middleware.js");
 const ExpressError = require("../utils/ExpressError.js");
 const multer=require("multer")
-const upload= multer({dest:"uploads/"})
+const {storage}=require("../cloudConfig.js")
+const upload= multer({storage})
 
 const listingController = require("../controllers/listing.js");
 
@@ -26,7 +27,7 @@ router
 //show all listings
 .get( wrapAsync(listingController.index))
 //create listing
-.post(validateListing , isLoggedIn ,wrapAsync(listingController.createListing))
+.post( isLoggedIn ,validateListing ,upload.single('listing[image]'),wrapAsync(listingController.createListing))
 
 //New Route
 router.get("/new", isLoggedIn , listingController.renderNewForm);
@@ -36,7 +37,7 @@ router
   //show listing
   .get(wrapAsync(listingController.showListing))
   // Update listing route
-  .put(validateListing , isLoggedIn , isOwner ,wrapAsync(listingController.updateListing))
+  .put(upload.single('listing[image]'),validateListing ,isLoggedIn , isOwner ,wrapAsync(listingController.updateListing))
   //delete listing
   .delete(isLoggedIn , isOwner , wrapAsync(listingController.destroyListing))
 
