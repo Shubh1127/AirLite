@@ -39,7 +39,11 @@ geometry:{
     type:[Number],
     required:true
   }
-}
+},
+// category:{
+//   type:String,
+//   enum:['mountains','arctic','farms','deserts']
+// }
 });
 
 listingSchema.post("findOneAndDelete", async (listing) => {

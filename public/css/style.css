@@ -111,3 +111,8 @@ a {
   height: 400px;
   width: 80vh;
 }
+
+.danger2{
+  background-color: #fe424d;
+  color: #fff;
+}
