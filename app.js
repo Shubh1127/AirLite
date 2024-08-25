@@ -4,6 +4,7 @@ if(process.env.NODE_ENV !="production"){
 const express=require("express")
 const mongoose=require("mongoose");
 const session=require("express-session")
+const MongoStore=require('connect-mongo')
 const path=require("path")
 const method=require("method-override");
 const ejsMate=require("ejs-mate")
@@ -40,9 +41,10 @@ const sessionOptions={
     app.engine('ejs',ejsMate);
     app.use(express.static(path.join(__dirname,"public")))
 
-    const url="mongodb://127.0.0.1:27017/Airbnb";
+    // const url="mongodb://127.0.0.1:27017/Airbnb";
+    const dbURL=process.env.ATLASDB_URL
     async function main() {
-        await mongoose.connect(url)
+        await mongoose.connect(dbURL)
     }
     main().then(()=>{
         console.log("connected to db")
