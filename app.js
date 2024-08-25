@@ -30,31 +30,31 @@ const sessionOptions={
 }
 
 
-let app=express();
-let port=8080;
-app.use(method("_method"));
+    let app=express();
+    let port=8080;
+    app.use(method("_method"));
 
-app.set("view engine","ejs");
-app.set("views",path.join(__dirname,"views"))
-app.use(express.urlencoded({extended:true}))
-app.engine('ejs',ejsMate);
-app.use(express.static(path.join(__dirname,"public")))
+    app.set("view engine","ejs");
+    app.set("views",path.join(__dirname,"views"))
+    app.use(express.urlencoded({extended:true}))
+    app.engine('ejs',ejsMate);
+    app.use(express.static(path.join(__dirname,"public")))
 
-const url="mongodb://127.0.0.1:27017/Airbnb";
-async function main() {
-    await mongoose.connect(url)
-}
-main().then(()=>{
-    console.log("connected to db")
-}) 
-.catch((err)=>{
-    console.log(err)
-})
+    const url="mongodb://127.0.0.1:27017/Airbnb";
+    async function main() {
+        await mongoose.connect(url)
+    }
+    main().then(()=>{
+        console.log("connected to db")
+    }) 
+    .catch((err)=>{
+        console.log(err)
+    })
 
 
-app.listen(port,(req,res)=>{
-    console.log("app is listening to port ",port);
-})
+    app.listen(port,(req,res)=>{
+        console.log("app is listening to port ",port);
+    })
 
 
 

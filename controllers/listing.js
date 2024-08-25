@@ -1,3 +1,7 @@
+const mbxGeocoding = require('@mapbox/mapbox-sdk/services/tilesets');
+const mapToken=process.env.MAP_TOKEN;
+const geocodingClient = mbxGeocoding({ accessToken: mapToken });
+
 const Listing =require("../models/listing")
 module.exports.index=async (req, res) => {
     // console.log(req.user)
@@ -25,6 +29,14 @@ module.exports.index=async (req, res) => {
   }
 
   module.exports.createListing=async (req, res, next) => {
+   let response=await  geocodingClient.forwardGeocode({
+      query: req.body.listing.location,
+      limit: 1
+    })
+      .send()
+     
+      console.log(response)
+      res.send("done")
    let url= req.file.path;
    let filename=req.file.filename;
     const newListing = new Listing(req.body.listing);
