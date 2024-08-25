@@ -1,27 +1,47 @@
 <% layout("/layouts/boilerplate")%>
 
-    <body>
-        
-        <h3>All Listings</h3>
-        <!-- <form method="get" action="/listings/new">
-        <button>Create New Listing</button>
-    </form> -->
-    <div class="row row-cols-lg-3 row-cols-md-2 row-cols-sm-1">
+    <style>
+        #filters{
+            display: flex;
+            flex-wrap: wrap;
+        }
+        .filter{
+            text-align: center;
+            margin-right: 2rem;
+            margin-top: 2rem;
+        }
+    </style>
+
+    <div id="filters">
+        <div class="filter">
+            <div> <i class="fa-solid fa-fire"></i></div>
+            <p>Trending</p>
+        </div>
+        <div class="filter">
+            <div> <i class="fa-solid fa-bed"></i></div>
+            <p>Rooms</p>
+        </div>
+    </div>
+
+    <div class="row row-cols-lg-3 row-cols-md-2 row-cols-sm-1 mt-3">
 
         <% for(let listing of allListings) { %>
             <a href="/listings/<%= listing._id %>" style="text-decoration: none;">
-            <div class=" col listing-card card " >
-                <img src="<%= listing.image.url %>" class="card-img-top" style= "height: 20rem; width: 20rem;" alt="listing_image">
-                <div class="card-img-overlay"></div>
-                <div class="card-body">
-                    <p class="card-text">
-                        <b><%=listing.title%></b><br>
-                        &#8377; <%= listing.price != null ? listing.price.toLocaleString("en-IN"): '' %> / night
-                        <br>
-                        
-                    </p>
+                <div class=" col listing-card card ">
+                    <img src="<%= listing.image.url %>" class="card-img-top" style="height: 20rem; width: 20rem;"
+                        alt="listing_image">
+                    <div class="card-img-overlay"></div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            <b>
+                                <%=listing.title%>
+                            </b><br>
+                            &#8377; <%= listing.price !=null ? listing.price.toLocaleString("en-IN"): '' %> / night
+                                <br>
+
+                        </p>
+                    </div>
                 </div>
-            </div>
             </a>
             <% } %>
-        </div>     </body>
+    </div>

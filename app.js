@@ -60,7 +60,7 @@ const sessionOptions={
 
 //root path
 app.get("/",(req,res)=>{
-    res.send("hello i am root")
+    res.redirect("/listings")
 })
 
 app.use(session(sessionOptions))

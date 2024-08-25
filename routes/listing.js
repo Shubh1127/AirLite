@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const Listing = require("../models/listing.js");
+
 const wrapAsync = require("../utils/wrapAsync.js");
 const { listingSchema } = require("../Schema.js");
 // const Review = require('../models/review.js'); // Adjust the path as needed
@@ -13,6 +13,8 @@ const upload= multer({storage})
 const listingController = require("../controllers/listing.js");
 
 const validateListing = (req, res, next) => {
+  // console.log(req.body)
+  // console.log(req.file)
   let { error } = listingSchema.validate(req.body);
   if (error) {
     console.log(error);
@@ -27,7 +29,7 @@ router
 //show all listings
 .get( wrapAsync(listingController.index))
 //create listing
-.post( isLoggedIn ,validateListing ,upload.single('listing[image]'),wrapAsync(listingController.createListing))
+.post( isLoggedIn ,upload.single('listing[image]'),validateListing ,wrapAsync(listingController.createListing))
 
 //New Route
 router.get("/new", isLoggedIn , listingController.renderNewForm);
