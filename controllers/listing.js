@@ -45,10 +45,11 @@ module.exports.index=async (req, res) => {
     newListing.geometry=response.body.features[0].geometry;
 
     console.log("Saving listing with geometry:", newListing.geometry);
+    console.log(newListing)
 
     await newListing.save();
     // let coordinates=newListing.geometry.coordinates;
-    // console.log("Saving listing with geometry:", newListing.geometry);
+    console.log("Saving listing with geometry:", newListing.geometry);
     req.flash("success", "New Listing Created!");
     res.redirect("/listings");
   }
@@ -101,3 +102,19 @@ module.exports.index=async (req, res) => {
     req.flash("success", "Listing Deleted");
     res.redirect("/listings");
   }
+  // module.exports.paymentGateway=async (req, res) => {
+  //   try {
+  //       const { amount } = req.body;
+  
+  //       const paymentIntent = await stripe.paymentIntents.create({
+  //           amount, // amount in cents
+  //           currency: 'usd', // Change currency if needed
+  //       });
+  
+  //       res.send({
+  //           clientSecret: paymentIntent.client_secret,
+  //       });
+  //   } catch (error) {
+  //       res.status(500).send({ error: error.message });
+  //   }
+  // }

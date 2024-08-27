@@ -47,7 +47,7 @@ router
 //edit listing
 router.get("/:id/edit" ,isLoggedIn , isOwner , wrapAsync(listingController.renderEditForm));
 
-
+// router.post('/create-payment-intent',(listingController.paymentGateway) );
 
 
 
