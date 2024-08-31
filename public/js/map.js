@@ -5,7 +5,7 @@ const map = new mapboxgl.Map({
   center: listing.geometry.coordinates, // starting position [lng, lat]. Note that lat must be set between -90 and 90
   zoom: 9, // starting zoom
 });
-console.log("coordinates from ejs", listing.geometry.coordinates); // This should output something like [77.209, 28.6139]
+// console.log("coordinates from ejs", listing.geometry.coordinates); // This should output something like [77.209, 28.6139]
 
 const marker = new mapboxgl.Marker({ color: "red" })
   .setLngLat(listing.geometry.coordinates)
