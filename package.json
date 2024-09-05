@@ -1,4 +1,9 @@
 {
+  
+    "engines": {
+      "node":"v20.12.2"
+    },
+  
   "name": "majorproject",
   "version": "1.0.0",
   "main": "index.js",
