@@ -19,8 +19,32 @@ const listingRouter=require("./routes/listing.js")
 const reviewRouter=require("./routes/reviews.js")
 const userRouter=require("./routes/user.js")
 
+const dbURL=process.env.ATLASDB_URL;
+    async function main() {
+        await mongoose.connect(dbURL);
+    }
+    main().then(()=>{
+        console.log("connected to db")
+    }) 
+    .catch((err)=>{
+        console.log(err)
+    })
+
+const store=MongoStore.create({
+    mongoUrl:dbURL,
+    crypto:{
+       secret: process.env.SECRET,
+    },
+    touchAfter:24*3600,
+})
+
+store.on("error",()=>{
+    console.log("error in MONGO SESSION STORE",err)
+})
+
 const sessionOptions={
-    secret: "musupersecretcode",
+    store,
+    secret: process.env.SECRET,
     resave:false,
     saveUninitialized:true,
     cookie:{
@@ -29,6 +53,7 @@ const sessionOptions={
         htttpOnly:true,
     }
 }
+
 
 
     let app=express();
@@ -41,17 +66,8 @@ const sessionOptions={
     app.engine('ejs',ejsMate);
     app.use(express.static(path.join(__dirname,"public")))
 
-    const url="mongodb://127.0.0.1:27017/Airbnb";
-    const dbURL=process.env.ATLASDB_URL
-    async function main() {
-        await mongoose.connect(url)
-    }
-    main().then(()=>{
-        console.log("connected to db")
-    }) 
-    .catch((err)=>{
-        console.log(err)
-    })
+    // const url="mongodb://127.0.0.1:27017/Airbnb";
+    
 
 
     app.listen(port,(req,res)=>{
