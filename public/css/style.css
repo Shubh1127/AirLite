@@ -79,7 +79,15 @@ a {
 .card-text p {
   font-weight: 400 !important;
 }
-
+.twoo{
+  height: 20rem !important;
+  border-radius: 1rem !important;
+  width: 25rem !important;
+  object-fit: cover !important;
+}
+.f1{
+  display: flex;
+}
 .bg {
   background-color: rgb(216, 28, 28);
   width: 60px;
