@@ -19,10 +19,10 @@ const Listing = require('./models/listing');
 const listingRouter=require("./routes/listing.js")
 const reviewRouter=require("./routes/reviews.js")
 const userRouter=require("./routes/user.js")
-const url="mongodb://127.0.0.1:27017/Airbnb"
+
 const dbURL=process.env.ATLASDB_URL;
     async function main() {
-        await mongoose.connect(url);
+        await mongoose.connect(dbURL);
     }
     main().then(()=>{
         console.log("connected to db")
@@ -32,7 +32,7 @@ const dbURL=process.env.ATLASDB_URL;
     })
 
 const store=MongoStore.create({
-    mongoUrl:url,
+    mongoUrl:dbURL,
     crypto:{
        secret: process.env.SECRET,
     },
