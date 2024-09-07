@@ -1,0 +1,33 @@
+<% layout("/layouts/boilerplate")%>
+
+
+
+    <% if (listings.length> 0) { %>
+
+        <div class=" row-cols-lg-3 mt-3 ">
+            <% listings.forEach(listing=> { %>
+                <a href="/listings/<%= listing._id %>" style="text-decoration: none;">
+                <div class="col listing-card offset-0 card ms-2" style="display: inline-block;">
+                    <img src="<%= listing.image.url %>" class="twoo" alt="listing_image">
+                    <div class="card-img-overlay"></div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            <b>
+                                <%=listing.title%>
+                            </b><br>
+                            &#8377; <%= listing.price !=null ? listing.price.toLocaleString("en-IN"): '' %> / night
+                                <i class="tax-info">&nbsp; +18% GST</i>
+                                <br>
+                        </p>
+
+
+                    </div>
+                </div>
+            </a>
+                <% }) %>
+                    </ul>
+                    <% } else { %>
+                        <p>No listings found matching your search.</p>
+                        <% } %>
+        </div>
+        </div>

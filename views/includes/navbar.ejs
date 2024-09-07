@@ -28,10 +28,16 @@
                 <b><a class="nav-link" href="/listings">Explore</a></b>
             </div>
             <div class="navbar-nav ms-auto">
-                <form class="d-flex" role="search">
-                    <input class="form-control me-2 ss" type="search" placeholder="Search destinations" >
-                    <button class="btn btn-danger danger2" type="submit"><i class="fa-solid fa-magnifying-glass"></i>Search</button>
-                </form>
+                <div class="navbar-nav ms-auto">
+                    <form class="d-flex" method="get" action="/search">
+                        <input class="form-control me-2 ss" type="search" id="searchInput" name="query" placeholder="Search destinations">
+                        <button class="btn btn-danger danger2" type="submit">
+                            <i class="fa-solid fa-magnifying-glass"></i>Search
+                        </button>
+                    </form>
+                    
+                </div>
+                 
             </div>
 
             <div class="navbar-nav ms-auto">
@@ -50,3 +56,27 @@
         </div>
     </div>
 </nav>
+<script>
+    function searchListings() {
+  const searchValue = document.getElementById('searchInput').value;
+
+  fetch(`/search?query=${encodeURIComponent(searchValue)}`)
+    .then(response => response.json())
+    .then(data => {
+      const searchResultsDiv = document.getElementById('searchResults');
+      searchResultsDiv.innerHTML = '';
+
+      if (data.length > 0) {
+        data.forEach(listing => {
+          const listingElement = document.createElement('div');
+          listingElement.innerText = listing.title; // Assuming 'title' is the field you want to display
+          searchResultsDiv.appendChild(listingElement);
+        });
+      } else {
+        searchResultsDiv.innerText = 'Listing not found';
+      }
+    })
+    .catch(error => console.error('Error fetching listings:', error));
+}
+
+</script>

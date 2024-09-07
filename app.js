@@ -13,15 +13,16 @@ const ExpressError=require("./utils/ExpressError.js")
 const passport=require("passport");
 const LocalStrategy=require("passport-local")
 const User=require("./models/user.js");
+const Listing = require('./models/listing');
 
 
 const listingRouter=require("./routes/listing.js")
 const reviewRouter=require("./routes/reviews.js")
 const userRouter=require("./routes/user.js")
-
+const url="mongodb://127.0.0.1:27017/Airbnb"
 const dbURL=process.env.ATLASDB_URL;
     async function main() {
-        await mongoose.connect(dbURL);
+        await mongoose.connect(url);
     }
     main().then(()=>{
         console.log("connected to db")
@@ -31,7 +32,7 @@ const dbURL=process.env.ATLASDB_URL;
     })
 
 const store=MongoStore.create({
-    mongoUrl:dbURL,
+    mongoUrl:url,
     crypto:{
        secret: process.env.SECRET,
     },
@@ -81,6 +82,8 @@ app.get("/",(req,res)=>{
     res.redirect("/listings")
 })
 
+
+
 app.use(session(sessionOptions))
 app.use(flash());
 
@@ -112,6 +115,31 @@ app.use((req,res,next)=>{
 app.use("/listings",listingRouter)
 app.use("/listings/:id/reviews",reviewRouter)
 app.use("/", userRouter)
+app.get("/search",async (req, res) => {
+    const searchQuery = req.query.query; 
+    // console.log('Search query:', searchQuery); 
+  
+    if (!searchQuery) {
+    //   console.log('No search query provided');
+      return res.render("listings/search", { listings: [] });
+    }
+  
+    try {
+        const listings = await Listing.find({
+            $or: [
+              { title: { $regex: searchQuery, $options: 'i' } }, // Case-insensitive search in title
+              { country: { $regex: searchQuery, $options: 'i' } } // Case-insensitive search in country
+            ]
+          });
+  
+    //   console.log('Listings found:', listings);
+      // Render the search.ejs file with the search results
+      res.render("listings/search", { listings });
+    } catch (error) {
+      console.error('Error searching listings:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
 
 app.all("*",(req,res,next)=>{
     next(new ExpressError(404,"Page Not Found!"));
