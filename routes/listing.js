@@ -13,7 +13,7 @@ const upload= multer({storage})
 const listingController = require("../controllers/listing.js");
 
 const validateListing = (req, res, next) => {
-  // console.log(req.body)
+  
   // console.log(req.file)
   let { error } = listingSchema.validate(req.body);
   if (error) {
