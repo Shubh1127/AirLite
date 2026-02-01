@@ -34,7 +34,11 @@ mongoose
 ========================= */
 app.use(
   cors({
-    origin: "http://localhost:3000", // Next.js frontend
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:3001", 
+      "https://air-lite.vercel.app"
+    ],
     credentials: true,
   })
 );
