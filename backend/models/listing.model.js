@@ -54,6 +54,21 @@ const listingSchema = new Schema(
   enum: [
     // Basic amenities
     "wifi", "Wifi", "Wi-Fi", "WiFi", "High-speed WiFi",
+    "tv", "TV", "Smart TV",
+    "essentials", "Essentials",
+    "hot water", "Hot Water",
+    "air mattress", "Air Mattress",
+    "private entrance", "Private Entrance",
+    "workspace", "Workspace", "Dedicated Workspace",  
+    "desk", "Desk",
+    "iron", "Iron",
+    "hair dryer", "Hair Dryer",
+    "self check-in", "Self Check-in",
+    "smoke alarm", "Smoke Alarm",
+    "carbon monoxide alarm", "Carbon Monoxide Alarm",
+    "first aid kit", "First Aid Kit",
+    "fire extinguisher", "Fire Extinguisher",
+    
     "kitchen", "Kitchen", "Full Kitchen", "Kitchenette", "Chef's Kitchen",
     "parking", "Parking",
     "heating", "Heating",

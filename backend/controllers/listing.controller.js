@@ -14,6 +14,20 @@ exports.getAllListings = async (req, res) => {
 };
 
 /* =========================
+   GET USER'S OWN LISTINGS
+========================= */
+exports.getMyListings = async (req, res) => {
+  try {
+    const listings = await Listing.find({ owner: req.user.id })
+      .populate("owner", "firstName lastName avatar")
+      .sort({ createdAt: -1 });
+    res.json(listings);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching listings", error: error.message });
+  }
+};
+
+/* =========================
    GET SINGLE LISTING
 ========================= */
 exports.getListingById = async (req, res) => {
@@ -159,63 +173,93 @@ function getResponseTimeDisplay(responseTime) {
    CREATE LISTING (HOST)
 ========================= */
 exports.createListing = async (req, res) => {
-  const {
-    title,
-    description,
-    location,
-    country,
-    pricePerNight,
-    maxGuests,
-    bedrooms,
-    beds,
-    bathrooms,
-    amenities,
-    category,
-  } = req.body;
+  try {
+    const {
+      title,
+      description,
+      location,
+      country,
+      pricePerNight,
+      cleaningFee,
+      serviceFee,
+      tax,
+      maxGuests,
+      bedrooms,
+      beds,
+      bathrooms,
+      amenities,
+      category,
+      address,
+      houseRules,
+      cancellationPolicy,
+    } = req.body;
 
-  // Mapbox geocoding
-  const geoResponse = await geocodingClient
-    .forwardGeocode({
-      query: location,
-      limit: 1,
-    })
-    .send();
+    // Validation
+    if (!title || !location || !category) {
+      return res.status(400).json({ message: "Title, location, and category are required" });
+    }
 
-  if (!geoResponse.body.features.length) {
-    return res.status(400).json({ message: "Invalid location" });
+    // Mapbox geocoding
+    const geoResponse = await geocodingClient
+      .forwardGeocode({
+        query: location,
+        limit: 1,
+      })
+      .send();
+
+    if (!geoResponse.body.features.length) {
+      return res.status(400).json({ message: "Invalid location" });
+    }
+
+    const geometry = geoResponse.body.features[0].geometry;
+
+    const images = req.files?.map((file) => ({
+      url: file.path,
+      filename: file.filename,
+    })) || [];
+
+    const listing = await Listing.create({
+      title,
+      description,
+      location,
+      country,
+      pricePerNight: Number(pricePerNight) || 0,
+      cleaningFee: Number(cleaningFee) || 0,
+      serviceFee: Number(serviceFee) || 0,
+      tax: Number(tax) || 0,
+      maxGuests: Number(maxGuests) || 1,
+      bedrooms: Number(bedrooms) || 1,
+      beds: Number(beds) || 1,
+      bathrooms: Number(bathrooms) || 1,
+      amenities: Array.isArray(amenities) ? amenities : [],
+      category,
+      address: address || {},
+      houseRules: Array.isArray(houseRules) ? houseRules : [],
+      cancellationPolicy: cancellationPolicy || "moderate",
+      images,
+      geometry,
+      owner: req.user.id,
+    });
+
+    // Update user role from guest to both if they create their first listing
+    const User = require("../models/user.model");
+    const user = await User.findById(req.user.id);
+    if (user && user.role === "guest") {
+      user.role = "both";
+      await user.save();
+    }
+
+    res.status(201).json({
+      message: "Listing created successfully",
+      listing,
+    });
+  } catch (error) {
+    console.error("Error creating listing:", error);
+    res.status(500).json({ 
+      message: "Error creating listing", 
+      error: error.message 
+    });
   }
-
-  const geometry = geoResponse.body.features[0].geometry;
-
-  const images = req.files?.map((file) => ({
-    url: file.path,
-    filename: file.filename,
-  })) || [];
-
-  const listing = await Listing.create({
-    title,
-    description,
-    location,
-    country,
-    pricePerNight,
-    cleaningFee: 200,
-    serviceFee: 150,
-    tax: 100,
-    maxGuests,
-    bedrooms,
-    beds,
-    bathrooms,
-    amenities,
-    category,
-    images,
-    geometry,
-    owner: req.user.id,
-  });
-
-  res.status(201).json({
-    message: "Listing created successfully",
-    listing,
-  });
 };
 
 /* =========================

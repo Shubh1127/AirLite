@@ -9,6 +9,7 @@ const upload = require("../middlewares/multer.middleware");
    PUBLIC
 ========================= */
 router.get("/", listingController.getAllListings);
+router.get("/user/my-listings", isLoggedIn, listingController.getMyListings);
 router.get("/:id", listingController.getListingById);
 
 router.post(
