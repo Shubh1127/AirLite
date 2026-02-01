@@ -23,9 +23,10 @@ exports.getListingById = async (req, res) => {
     const listing = await Listing.findById(id)
       .populate({
         path: "reviews",
+        options: { sort: { createdAt: -1 } }, // Sort reviews by newest first
         populate: { 
           path: "author", 
-          select: "firstName lastName avatar" 
+          select: "firstName lastName avatar createdAt" 
         },
       })
       .populate({
@@ -39,6 +40,35 @@ exports.getListingById = async (req, res) => {
 
     const host = listing.owner;
     
+    // Calculate average ratings per category from reviews
+    const reviewsData = listing.reviews || [];
+    const ratingsBreakdown = {
+      cleanliness: 0,
+      accuracy: 0,
+      communication: 0,
+      location: 0,
+      checkIn: 0,
+      value: 0
+    };
+
+    if (reviewsData.length > 0) {
+      reviewsData.forEach(review => {
+        if (review.ratings) {
+          ratingsBreakdown.cleanliness += review.ratings.cleanliness || 0;
+          ratingsBreakdown.accuracy += review.ratings.accuracy || 0;
+          ratingsBreakdown.communication += review.ratings.communication || 0;
+          ratingsBreakdown.location += review.ratings.location || 0;
+          ratingsBreakdown.checkIn += review.ratings.checkIn || 0;
+          ratingsBreakdown.value += review.ratings.value || 0;
+        }
+      });
+
+      // Calculate averages
+      Object.keys(ratingsBreakdown).forEach(key => {
+        ratingsBreakdown[key] = (ratingsBreakdown[key] / reviewsData.length).toFixed(1);
+      });
+    }
+    
     // SAFE ACCESS - Handle missing fields gracefully
     const hostProfile = host.hostProfile || {};
     const hostStats = host.hostStats || {};
@@ -50,12 +80,13 @@ exports.getListingById = async (req, res) => {
       ...listing.toObject(),
 
       mapboxToken: process.env.MAP_TOKEN, // Add Mapbox token
+      ratingsBreakdown, // Add calculated ratings breakdown
       hostDetails: {
         id: host._id,
         firstName: host.firstName,
         lastName: host.lastName,
         fullName: `${host.firstName} ${host.lastName}`,
-        avatar: host.avatar,
+        avatar: host.avatar.url || null,
         email: host.email || null,
         phone: host.phone || null,
         role: host.role || "guest",

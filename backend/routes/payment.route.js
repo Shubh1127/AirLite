@@ -1,26 +1,16 @@
-// const express = require('express');
-// const router = express.Router();
-// const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const express = require('express');
+const router = express.Router();
+const paymentController = require('../controllers/payment.controller');
+const { isLoggedIn } = require('../middlewares/auth.middlware');
 
-// router.post('/create-payment-intent', async (req, res) => {
-//     const { amount, currency } = req.body;
+/* =========================
+   PAYMENT ROUTES
+========================= */
 
-//     try {
-//         const paymentIntent = await stripe.paymentIntents.create({
-//             amount,
-//             currency,
-//             // You can include additional metadata or configuration here
-//         });
+// Create order
+router.post('/create-order', isLoggedIn, paymentController.createOrder);
 
-//         res.status(200).json({
-//             clientSecret: paymentIntent.client_secret,
-//         });
+// Verify payment
+router.post('/verify-payment', isLoggedIn, paymentController.verifyPayment);
 
-        
-//     } catch (error) {
-//         console.error("Payment Intent Creation Error:", error);
-//         res.status(500).json({ error: error.message });
-//     }
-// });
-
-// module.exports = router;
+module.exports = router;

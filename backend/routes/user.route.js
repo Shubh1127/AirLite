@@ -25,6 +25,12 @@ router.post("/logout", userController.logout);
 // Get logged-in user
 router.get("/me", isLoggedIn, userController.getMe);
 
+// Get logged-in user's reviews
+router.get("/me/reviews", isLoggedIn, userController.getMyReviews);
+
+// Get logged-in user's trips
+router.get("/me/trips", isLoggedIn, userController.getMyTrips);
+
 // Update profile
 router.put("/profile", isLoggedIn, upload.single("avatar"), userController.updateProfile);
 

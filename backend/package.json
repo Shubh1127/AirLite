@@ -35,6 +35,7 @@
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
     "passport-local-mongoose": "^8.0.0",
+    "razorpay": "^2.8.2",
     "stripe": "^16.8.0"
   }
 }

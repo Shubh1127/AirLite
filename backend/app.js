@@ -12,6 +12,7 @@ console.log("SECRET loaded:", !!process.env.SECRET);
 const listingRoutes = require("./routes/listing.route");
 const reviewRoutes = require("./routes/reviews.route");
 const userRoutes = require("./routes/user.route");
+const paymentRoutes = require("./routes/payment.route");
 
 const ExpressError = require("./utils/ExpressError.util");
 
@@ -47,6 +48,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api/users", userRoutes);
 app.use("/api/listings", listingRoutes);
 app.use("/api/listings/:id/reviews", reviewRoutes);
+app.use("/api/payments", paymentRoutes);
 
 /* =========================
    HEALTH CHECK

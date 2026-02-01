@@ -141,6 +141,14 @@ const listingSchema = new Schema(
   ]
 }],
 
+    locationFeatures: [
+      {
+        title: String,
+        description: String,
+        icon: String,
+      },
+    ],
+
     houseRules: [String],
 
     cancellationPolicy: {
