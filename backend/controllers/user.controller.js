@@ -267,7 +267,7 @@ exports.getMyTrips = async (req, res) => {
     const trips = await Reservation.find({ guest: req.user.id })
       .populate({
         path: "listing",
-        select: "title location country images pricePerNight",
+        select: "title location country images pricePerNight cancellationPolicy",
       })
       .sort({ createdAt: -1 });
 
