@@ -167,9 +167,58 @@ const listingSchema = new Schema(
     houseRules: [String],
 
     cancellationPolicy: {
-      type: String,
-      enum: ["flexible", "moderate", "strict"],
-      default: "moderate",
+      type: {
+        type: String,
+        enum: ["flexible", "moderate", "strict", "non-refundable"],
+        default: "moderate",
+      },
+      description: {
+        type: String,
+        default: function() {
+          switch(this.cancellationPolicy?.type || "moderate") {
+            case "flexible":
+              return "Free cancellation up to 24 hours before check-in. Cancel before that and get a full refund. After that, 50% refund if cancelled at least 7 days before check-in.";
+            case "moderate":
+              return "Free cancellation up to 5 days before check-in for a full refund. Cancel between 5 days and 24 hours before check-in and get a 50% refund. No refund after that.";
+            case "strict":
+              return "Free cancellation up to 14 days before check-in for a full refund. Cancel between 14 days and 7 days before check-in and get a 50% refund. No refund after that.";
+            case "non-refundable":
+              return "This reservation is non-refundable. You won't get a refund if you cancel.";
+            default:
+              return "Free cancellation up to 5 days before check-in for a full refund.";
+          }
+        }
+      },
+      refundPercentages: {
+        type: Map,
+        of: Number,
+        default: function() {
+          switch(this.cancellationPolicy?.type || "moderate") {
+            case "flexible":
+              return new Map([
+                ["24hours", 100],  // Full refund if cancelled 24h+ before check-in
+                ["7days", 50],     // 50% refund if cancelled 7+ days before
+                ["default", 0]     // No refund otherwise
+              ]);
+            case "moderate":
+              return new Map([
+                ["5days", 100],    // Full refund if cancelled 5+ days before
+                ["24hours", 50],   // 50% refund if cancelled 24h+ before
+                ["default", 0]     // No refund otherwise
+              ]);
+            case "strict":
+              return new Map([
+                ["14days", 100],   // Full refund if cancelled 14+ days before
+                ["7days", 50],     // 50% refund if cancelled 7+ days before
+                ["default", 0]     // No refund otherwise
+              ]);
+            case "non-refundable":
+              return new Map([["default", 0]]);
+            default:
+              return new Map([["5days", 100], ["24hours", 50], ["default", 0]]);
+          }
+        }
+      }
     },
 
     availability: {

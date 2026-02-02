@@ -56,9 +56,54 @@ const reservationSchema = new Schema(
 
     status: {
       type: String,
-      enum: ['pending', 'confirmed', 'cancelled', 'completed'],
+      enum: ['pending', 'confirmed', 'cancelled', 'completed', 'refund-pending', 'refunded'],
       default: 'pending',
     },
+
+    cancellationReason: {
+      type: String,
+    },
+
+    refundAmount: {
+      type: Number,
+      default: 0,
+    },
+
+    refundPercentage: {
+      type: Number,
+      default: 0,
+    },
+
+    refundStatus: {
+      type: String,
+      enum: ['none', 'pending', 'initiated', 'completed', 'failed'],
+      default: 'none',
+    },
+
+    refundTransactionId: {
+      type: String,
+    },
+
+    refundedAt: {
+      type: Date,
+    },
+
+    canEdit: {
+      type: Boolean,
+      default: true,
+    },
+
+    editHistory: [{
+      editedAt: Date,
+      previousCheckIn: Date,
+      previousCheckOut: Date,
+      newCheckIn: Date,
+      newCheckOut: Date,
+      editedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+      }
+    }],
 
     razorpayOrderId: {
       type: String,

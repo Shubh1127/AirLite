@@ -15,6 +15,9 @@ router.post("/register", userController.register);
 // Login
 router.post("/login", userController.login);
 
+// OAuth Google Login/Register
+router.post("/oauth/google", userController.googleOAuth);
+
 // Logout (client-side token removal)
 router.post("/logout", userController.logout);
 
@@ -33,6 +36,9 @@ router.get("/me/trips", isLoggedIn, userController.getMyTrips);
 
 // Update profile
 router.put("/profile", isLoggedIn, upload.single("avatar"), userController.updateProfile);
+
+// Skip profile setup (for OAuth users)
+router.post("/skip-profile-setup", isLoggedIn, userController.skipProfileSetup);
 
 // Change password
 router.put("/change-password", isLoggedIn, userController.changePassword);

@@ -14,6 +14,43 @@ exports.getAllListings = async (req, res) => {
 };
 
 /* =========================
+   GET LOCATION SUGGESTIONS
+========================= */
+exports.getLocationSuggestions = async (req, res) => {
+  try {
+    const query = (req.query.query || "").trim();
+
+    if (!query) {
+      return res.json({ suggestions: [] });
+    }
+
+    const regex = new RegExp(query, "i");
+    const listings = await Listing.find({
+      $or: [{ location: regex }, { country: regex }],
+    })
+      .select("location country -_id")
+      .limit(50)
+      .lean();
+
+    const suggestionSet = new Set();
+    listings.forEach((listing) => {
+      if (listing.location && regex.test(listing.location)) {
+        suggestionSet.add(listing.location);
+      }
+      if (listing.country && regex.test(listing.country)) {
+        suggestionSet.add(listing.country);
+      }
+    });
+
+    const suggestions = Array.from(suggestionSet).slice(0, 8);
+    res.json({ suggestions });
+  } catch (error) {
+    console.error("Error fetching suggestions:", error);
+    res.status(500).json({ message: "Error fetching suggestions" });
+  }
+};
+
+/* =========================
    GET USER'S OWN LISTINGS
 ========================= */
 exports.getMyListings = async (req, res) => {

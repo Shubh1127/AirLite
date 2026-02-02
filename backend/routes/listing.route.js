@@ -9,8 +9,9 @@ const upload = require("../middlewares/multer.middleware");
    PUBLIC
 ========================= */
 router.get("/", listingController.getAllListings);
+router.get("/suggestions", listingController.getLocationSuggestions);
 router.get("/user/my-listings", isLoggedIn, listingController.getMyListings);
-router.get("/:id", listingController.getListingById);
+router.get("/:id([0-9a-fA-F]{24})", listingController.getListingById);
 
 router.post(
   "/",
@@ -20,12 +21,12 @@ router.post(
 );
 
 router.put(
-  "/:id",
+  "/:id([0-9a-fA-F]{24})",
   isLoggedIn,
   upload.array("images", 5),
   listingController.updateListing
 );
 
-router.delete("/:id", isLoggedIn, listingController.deleteListing);
+router.delete("/:id([0-9a-fA-F]{24})", isLoggedIn, listingController.deleteListing);
 
 module.exports = router;

@@ -13,7 +13,7 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: function () {
-        return this.provider === "local"; // Only required for local auth
+        return !this.provider || this.provider === "local"; // Only required for local auth
       },
       select: false,
     },
@@ -21,7 +21,13 @@ const userSchema = new mongoose.Schema(
     provider: {
       type: String,
       default: "local",
-      enum: ["local", "google", "facebook", "github"],
+      enum: ["local", "google", "facebook", "github","both"],
+    },
+
+    googleId: {
+      type: String,
+      sparse: true,
+      unique: true,
     },
 
     isEmailVerified: {

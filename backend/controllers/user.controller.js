@@ -63,37 +63,54 @@ exports.register = async (req, res) => {
 };
 
 /* =========================
-   LOGIN
+   LOGIN (Email + Password)
 ========================= */
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
+      return res.status(400).json({
+        message: "Email and password are required",
+      });
     }
 
     const user = await User.findOne({ email }).select("+password");
 
-    if (!user || !user.password) {
-      return res.status(401).json({ message: "Invalid email or password" });
+    if (!user) {
+      return res.status(401).json({
+        message: "Invalid email or password",
+      });
     }
 
+    // 🚫 Block password login for Google-only users
+    if (user.provider === "google") {
+      return res.status(403).json({
+        message: "This account uses Google sign-in. Please continue with Google.",
+      });
+    }
+
+    // 🚫 Account blocked
     if (user.isBlocked) {
-      return res.status(403).json({ message: "Account blocked" });
+      return res.status(403).json({
+        message: "Account blocked",
+      });
     }
 
-    // const isMatch = await user.comparePassword(password);
-    // if (!isMatch) {
-    //   return res.status(401).json({ message: "Invalid email or password" });
-    // }
+    // ✅ Password check (REQUIRED)
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({
+        message: "Invalid email or password",
+      });
+    }
 
     user.lastLogin = new Date();
     await user.save();
 
     const token = generateToken(user._id);
 
-    res.json({
+    res.status(200).json({
       message: "Login successful",
       token,
       user: {
@@ -108,10 +125,98 @@ exports.login = async (req, res) => {
     });
   } catch (err) {
     console.error("Login error:", err);
-    res.status(500).json({ message: "Login failed" });
+    res.status(500).json({
+      message: "Login failed",
+    });
   }
 };
-   
+
+
+exports.googleOAuth = async (req, res) => {
+  try {
+    const { email, firstName, lastName, avatar, googleId } = req.body;
+    console.log("request is coming",req.body)
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    let user = await User.findOne({ email });
+    console.log(user)
+
+    if (user) {
+      // ✅ Link Google account safely
+      if (!user.googleId) {
+        user.googleId = googleId;
+      }
+
+      // ✅ Correct provider merge logic
+      if (user.provider === "local") {
+        user.provider = "both";
+      } else if (user.provider !== "both") {
+        user.provider = "google";
+      }
+
+      // ✅ Update avatar only if missing
+      if (avatar && !user.avatar?.url) {
+        user.avatar = { url: avatar, publicId: "" };
+      }
+
+      user.lastLogin = new Date();
+      await user.save();
+
+      const token = generateToken(user._id);
+
+      return res.status(200).json({
+        message: "Login successful",
+        token,
+        user: {
+          id: user._id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          profile: user.profile,
+          avatar: user.avatar,
+        },
+        needsAdditionalInfo: !user.phone || !user.dateOfBirth,
+      });
+    }
+
+    // ✅ New Google user
+    user = await User.create({
+      email,
+      firstName: firstName || email.split("@")[0],
+      lastName: lastName || "",
+      googleId,
+      provider: "google",
+      isEmailVerified: true,
+      avatar: avatar ? { url: avatar, publicId: "" } : undefined,
+      lastLogin: new Date(),
+    });
+
+    const token = generateToken(user._id);
+
+    res.status(201).json({
+      message: "User registered successfully via Google",
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        profile: user.profile,
+        avatar: user.avatar,
+      },
+      needsAdditionalInfo: !user.phone || !user.dateOfBirth,
+    });
+  } catch (err) {
+    console.error("Google OAuth error:", err);
+    res.status(500).json({ message: "OAuth failed" });
+  }
+};
+
 
 /* =========================
    GET CURRENT USER
@@ -219,6 +324,37 @@ exports.updateProfile = async (req, res) => {
   } catch (err) {
     console.error("Update profile error:", err);
     res.status(500).json({ message: "Profile update failed" });
+  }
+};
+
+/* =========================
+   SKIP PROFILE SETUP
+========================= */
+exports.skipProfileSetup = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Just mark that we've processed the OAuth without requiring additional info
+    // This is done by setting a flag or just returning success
+    // The needsAdditionalInfo will be false since it's based on missing phone/dateOfBirth
+    // But we can add a field if needed
+    
+    res.json({
+      message: "Profile setup skipped",
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+      needsAdditionalInfo: false,
+    });
+  } catch (err) {
+    console.error("Skip profile setup error:", err);
+    res.status(500).json({ message: "Failed to skip profile setup" });
   }
 };
 
