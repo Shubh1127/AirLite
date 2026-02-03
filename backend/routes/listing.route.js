@@ -10,6 +10,7 @@ const upload = require("../middlewares/multer.middleware");
 ========================= */
 router.get("/", listingController.getAllListings);
 router.get("/suggestions", listingController.getLocationSuggestions);
+router.get("/address-lookup", listingController.lookupAddress);
 router.get("/user/my-listings", isLoggedIn, listingController.getMyListings);
 router.get("/:id([0-9a-fA-F]{24})", listingController.getListingById);
 

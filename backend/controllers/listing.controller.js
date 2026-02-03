@@ -5,6 +5,144 @@ const geocodingClient = mbxGeocoding({
   accessToken: process.env.MAP_TOKEN,
 });
 
+const parseAddressPayload = (address) => {
+  if (!address) return {};
+  if (typeof address === "string") {
+    try {
+      return JSON.parse(address);
+    } catch (error) {
+      return {};
+    }
+  }
+  return address;
+};
+
+const extractAddressFromFeature = (feature) => {
+  const result = {
+    city: "",
+    state: "",
+    zipCode: "",
+  };
+
+  if (!feature) return result;
+
+  if (feature.properties?.postcode) {
+    result.zipCode = feature.properties.postcode;
+  }
+
+  if (feature.place_type?.includes("postcode") && feature.text) {
+    result.zipCode = result.zipCode || feature.text;
+  }
+
+  const context = feature.context || [];
+  context.forEach((item) => {
+    if (item.id?.startsWith("postcode") && item.text) {
+      result.zipCode = result.zipCode || item.text;
+    }
+    if (item.id?.startsWith("place") && item.text) {
+      result.city = result.city || item.text;
+    }
+    if (item.id?.startsWith("region") && item.text) {
+      result.state = result.state || item.text;
+    }
+  });
+
+  return result;
+};
+
+const resolveAddressFields = async ({ address, country }) => {
+  const normalized = {
+    street: address?.street || "",
+    city: address?.city || "",
+    state: address?.state || "",
+    zipCode: address?.zipCode || "",
+  };
+
+  const hasZip = Boolean(normalized.zipCode);
+  const hasCityState = Boolean(normalized.city || normalized.state);
+
+  if (!hasZip && !hasCityState) {
+    return normalized;
+  }
+
+  try {
+    if (hasZip && (!normalized.city || !normalized.state)) {
+      const zipQuery = `${normalized.zipCode} ${country || ""}`.trim();
+      const zipResponse = await geocodingClient
+        .forwardGeocode({ query: zipQuery, limit: 1 })
+        .send();
+      const feature = zipResponse.body.features?.[0];
+      const extracted = extractAddressFromFeature(feature);
+      if (extracted.city) normalized.city = extracted.city;
+      if (extracted.state) normalized.state = extracted.state;
+      if (extracted.zipCode) normalized.zipCode = extracted.zipCode;
+    } else if (!hasZip && hasCityState) {
+      const cityQuery = `${normalized.city} ${normalized.state} ${country || ""}`.trim();
+      const cityResponse = await geocodingClient
+        .forwardGeocode({ query: cityQuery, limit: 1 })
+        .send();
+      const feature = cityResponse.body.features?.[0];
+      const extracted = extractAddressFromFeature(feature);
+      if (extracted.zipCode) normalized.zipCode = extracted.zipCode;
+      if (extracted.city && !normalized.city) normalized.city = extracted.city;
+      if (extracted.state && !normalized.state) normalized.state = extracted.state;
+    }
+  } catch (error) {
+    console.error("Error resolving address fields:", error);
+  }
+
+  return normalized;
+};
+
+const normalizeCancellationPolicy = (value, fallbackType = "moderate") => {
+  if (!value) return undefined;
+
+  let policy = value;
+
+  if (typeof policy === "string") {
+    const trimmed = policy.trim();
+    if (!trimmed || trimmed === "[object Object]") {
+      return undefined;
+    }
+
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        policy = JSON.parse(trimmed);
+      } catch (error) {
+        policy = trimmed;
+      }
+    } else {
+      policy = trimmed;
+    }
+  }
+
+  if (typeof policy === "string") {
+    const type = policy || fallbackType;
+    return {
+      type,
+      ...getCancellationPolicyData(type),
+    };
+  }
+
+  if (typeof policy === "object") {
+    const type =
+      typeof policy.type === "string"
+        ? policy.type
+        : typeof policy.type?.type === "string"
+        ? policy.type.type
+        : fallbackType;
+
+    const base = getCancellationPolicyData(type);
+    return {
+      type,
+      description: policy.description || base.description,
+      refundPercentages: policy.refundPercentages || base.refundPercentages,
+    };
+  }
+
+  return undefined;
+};
+
 /* =========================
    GET ALL LISTINGS
 ========================= */
@@ -231,6 +369,15 @@ exports.createListing = async (req, res) => {
       cancellationPolicy,
     } = req.body;
 
+    const parsedAddress = parseAddressPayload(address);
+    const resolvedAddress = await resolveAddressFields({ address: parsedAddress, country });
+    const normalizedCancellationPolicy =
+      normalizeCancellationPolicy(cancellationPolicy, "moderate") ||
+      {
+        type: "moderate",
+        ...getCancellationPolicyData("moderate"),
+      };
+
     // Validation
     if (!title || !location || !category) {
       return res.status(400).json({ message: "Title, location, and category are required" });
@@ -270,9 +417,9 @@ exports.createListing = async (req, res) => {
       bathrooms: Number(bathrooms) || 1,
       amenities: Array.isArray(amenities) ? amenities : [],
       category,
-      address: address || {},
+      address: resolvedAddress,
       houseRules: Array.isArray(houseRules) ? houseRules : [],
-      cancellationPolicy: cancellationPolicy || "moderate",
+      cancellationPolicy: normalizedCancellationPolicy,
       images,
       geometry,
       owner: req.user.id,
@@ -316,6 +463,26 @@ exports.updateListing = async (req, res) => {
     return res.status(403).json({ message: "Not authorized" });
   }
 
+  if (req.body.address) {
+    const parsedAddress = parseAddressPayload(req.body.address);
+    const resolvedAddress = await resolveAddressFields({
+      address: parsedAddress,
+      country: req.body.country || listing.country,
+    });
+    listing.address = resolvedAddress;
+    delete req.body.address;
+  }
+
+  if (req.body.cancellationPolicy) {
+    const normalizedCancellationPolicy =
+      normalizeCancellationPolicy(req.body.cancellationPolicy, listing.cancellationPolicy?.type || "moderate") ||
+      listing.cancellationPolicy;
+    if (normalizedCancellationPolicy) {
+      listing.cancellationPolicy = normalizedCancellationPolicy;
+    }
+    delete req.body.cancellationPolicy;
+  }
+
   Object.assign(listing, req.body);
 
   if (req.files && req.files.length > 0) {
@@ -332,6 +499,35 @@ exports.updateListing = async (req, res) => {
     message: "Listing updated successfully",
     listing,
   });
+};
+
+/* =========================
+   LOOKUP ADDRESS
+========================= */
+exports.lookupAddress = async (req, res) => {
+  try {
+    const { zipCode, city, state, country } = req.query;
+    const address = {
+      street: "",
+      city: (city || "").toString(),
+      state: (state || "").toString(),
+      zipCode: (zipCode || "").toString(),
+    };
+
+    const resolvedAddress = await resolveAddressFields({
+      address,
+      country: (country || "").toString(),
+    });
+
+    res.json({
+      city: resolvedAddress.city,
+      state: resolvedAddress.state,
+      zipCode: resolvedAddress.zipCode,
+    });
+  } catch (error) {
+    console.error("Error looking up address:", error);
+    res.status(500).json({ message: "Error looking up address" });
+  }
 };
 
 /* =========================
