@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import StepIndicator from "@/components/host/StepIndicator";
@@ -16,10 +16,21 @@ import { useAuthStore } from "@/store/authStore";
 
 export default function CreateListingPage() {
   const router = useRouter();
-  const { updateUser, user } = useAuthStore();
+  const { updateUser, user, isAuthenticated, hasHydrated } = useAuthStore();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const totalSteps = 8;
+
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (!isAuthenticated) {
+      router.replace("/auth/login?next=/become-a-host/create");
+    }
+  }, [hasHydrated, isAuthenticated, router]);
+
+  if (!hasHydrated || !isAuthenticated) {
+    return null;
+  }
 
   const [formData, setFormData] = useState({
     // Step 1: Property Type
@@ -288,8 +299,8 @@ export default function CreateListingPage() {
       <header className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-50">
         <div className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
           <button
-            onClick={() => router.push("/become-a-host")}
-            className="text-sm font-medium text-gray-700 hover:text-gray-900"
+            onClick={() => router.push("/")}
+            className="text-sm font-medium text-gray-700 rounded-full border p-2 cursor-pointer hover:bg-gray-100 px-3 hover:text-gray-900"
           >
             Exit
           </button>
@@ -309,7 +320,7 @@ export default function CreateListingPage() {
           <button
             onClick={handleBack}
             disabled={currentStep === 1}
-            className="flex items-center gap-2 px-6 py-3 text-sm font-medium text-gray-700 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed underline"
+            className="flex items-center cursor-pointer gap-2 px-6 py-3 text-sm font-medium text-gray-700 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed underline"
           >
             <ChevronLeft className="w-4 h-4" />
             Back
@@ -318,7 +329,7 @@ export default function CreateListingPage() {
           <button
             onClick={currentStep === totalSteps ? handleSubmit : handleNext}
             disabled={isSubmitting}
-            className="flex items-center gap-2 px-8 py-3 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center cursor-pointer gap-2 px-8 py-3 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? "Submitting..." : (currentStep === totalSteps ? "Submit" : "Next")}
             {currentStep < totalSteps && <ChevronRight className="w-4 h-4" />}

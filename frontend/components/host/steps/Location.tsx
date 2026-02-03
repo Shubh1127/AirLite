@@ -1,3 +1,6 @@
+import { useEffect, useRef, useState } from "react";
+import { listingsAPI } from "@/lib/listings";
+
 export default function Location({
   country,
   location,
@@ -15,6 +18,62 @@ export default function Location({
   setAddress: (field: string, value: string) => void;
   setGeometry: (value: any) => void;
 }) {
+  const [isAutoFilling, setIsAutoFilling] = useState(false);
+  const lastLookupRef = useRef("");
+
+  useEffect(() => {
+    const zipCode = address.zipCode.trim();
+    const city = address.city.trim();
+    const state = address.state.trim();
+    const countryValue = country.trim();
+
+    const lookupByZip = zipCode.length >= 4;
+    const lookupByCityState = !zipCode && Boolean(city && state);
+
+    if (!lookupByZip && !lookupByCityState) {
+      return;
+    }
+
+    const lookupKey = lookupByZip
+      ? `zip:${zipCode}|${countryValue}`
+      : `city:${city}|${state}|${countryValue}`;
+
+    if (lastLookupRef.current === lookupKey) {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      lastLookupRef.current = lookupKey;
+      setIsAutoFilling(true);
+      try {
+        const data = await listingsAPI.addressLookup({
+          zipCode: lookupByZip ? zipCode : undefined,
+          city: lookupByCityState ? city : undefined,
+          state: lookupByCityState ? state : undefined,
+          country: countryValue || undefined,
+        });
+
+        if (data?.zipCode) {
+          setAddress("zipCode", data.zipCode);
+        }
+        if (data?.city) {
+          setAddress("city", data.city);
+        }
+        if (data?.state) {
+          setAddress("state", data.state);
+        }
+      } catch (error) {
+        console.error("Address lookup failed:", error);
+      } finally {
+        setIsAutoFilling(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [address.zipCode, address.city, address.state, country, setAddress]);
+
+  const isZipLocked = address.zipCode.trim().length >= 4;
+
   return (
     <div className="space-y-8">
       <div>
@@ -47,7 +106,11 @@ export default function Location({
           <input
             type="text"
             value={location}
-            onChange={(e) => setLocation(e.target.value)}
+            disabled={isZipLocked}
+            onChange={(e) => {
+              setLocation(e.target.value);
+              setAddress("city", e.target.value);
+            }}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
             placeholder="Mumbai"
           />
@@ -66,31 +129,18 @@ export default function Location({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              City
-            </label>
-            <input
-              type="text"
-              value={address.city}
-              onChange={(e) => setAddress("city", e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-              placeholder="Mumbai"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              State
-            </label>
-            <input
-              type="text"
-              value={address.state}
-              onChange={(e) => setAddress("state", e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-              placeholder="Maharashtra"
-            />
-          </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            State
+          </label>
+          <input
+            type="text"
+            value={address.state}
+            onChange={(e) => setAddress("state", e.target.value)}
+            disabled={isZipLocked}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+            placeholder="Maharashtra"
+          />
         </div>
 
         <div>
@@ -104,6 +154,9 @@ export default function Location({
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
             placeholder="400001"
           />
+          {isAutoFilling && (
+            <p className="text-xs text-gray-500 mt-2">Auto-filling address…</p>
+          )}
         </div>
       </div>
     </div>

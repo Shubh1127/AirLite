@@ -2,7 +2,7 @@
 
 import { api } from "@/lib/api";
 import { listingsAPI } from "@/lib/listings";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import {
   Heart,
@@ -53,10 +53,14 @@ import { format, formatDistanceToNow } from "date-fns";
 
 export default function ListingDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = params.id as string;
   const [listing, setListing] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [checkInDate, setCheckInDate] = useState<Date | undefined>();
+  const [checkInDate, setCheckInDate] = useState<Date | undefined>(() => {
+    const checkInParam = searchParams.get('checkIn');
+    return checkInParam ? new Date(checkInParam) : undefined;
+  });
   const [checkOutDate, setCheckOutDate] = useState<Date | undefined>();
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
@@ -190,13 +194,45 @@ export default function ListingDetailPage() {
     );
   }
 
-  if (!listing) {
-    return (
-      <div className="container mx-auto py-8">
-        <div className="text-center">Listing not found</div>
+ if (!listing) {
+  return (
+    <div className="min-h-[calc(100vh-80px)] flex items-center justify-center px-6">
+      <div className="max-w-xl w-full text-center bg-white rounded-2xl p-10 shadow-[0_10px_30px_rgba(0,0,0,0.1)]">
+        {/* Icon */}
+        <div className="text-6xl mb-4">🏡</div>
+
+        {/* Title */}
+        <h1 className="text-3xl font-bold mb-3">
+          Listing not found
+        </h1>
+
+        {/* Description */}
+        <p className="text-gray-600 mb-8">
+          The place you’re looking for may have been removed, expired,
+          or the link might be incorrect.
+        </p>
+
+        {/* Actions */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center px-6 py-3 rounded-xl font-semibold bg-black text-white hover:bg-gray-800 transition"
+          >
+            Back to Home
+          </Link>
+
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center px-6 py-3 rounded-xl font-semibold border border-gray-300 hover:bg-gray-50 transition"
+          >
+            Browse listings
+          </Link>
+        </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
+
 
   return (
     <div className="max-w-5xl mx-auto px-12 py-6">
@@ -407,7 +443,7 @@ export default function ListingDetailPage() {
             {listing.amenities && listing.amenities.length > 6 && (
               <button
                 onClick={() => setShowAllAmenities(true)}
-                className="mt-6 border border-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-50"
+                className="mt-6 cursor-pointer border border-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-50"
               >
                 Show all {listing.amenities.length} amenities
               </button>
@@ -1068,11 +1104,11 @@ export default function ListingDetailPage() {
               <span>📅</span> Cancellation policy
             </h4>
             <div>
-              <p>{listing.cancellationPolicy}</p>
-              <h1 className="text-gray-600">It includes</h1>
-              <span className="text-gray-600">
+              {/* <p>{listing.cancellationPolicy.type}</p> */}
+              <h1 className="text-gray-600 text-[15px]">{listing.cancellationPolicy.description}</h1>
+              {/* <span className="text-gray-600">
                 ₹{listing.serviceFee} serviceFee+₹{listing.tax} taxes
-              </span>
+              </span> */}
             </div>
             {/* <p className="text-sm text-gray-700 mb-2">
               This reservation is non-refundable.

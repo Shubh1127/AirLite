@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Globe, Menu, User } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { signOut } from 'next-auth/react';
 import { useAuthStore } from '@/store/authStore';
 import {
   DropdownMenu,
@@ -26,7 +27,7 @@ export function Navbar() {
   const { user, isAuthenticated, logout } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
-  // console.log(user)
+  // console.log(user?.avatar.url)
 
   useEffect(() => {
     setMounted(true);
@@ -38,9 +39,10 @@ export function Navbar() {
     router.push('/users/profile');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     logout();
-    router.push('/');
+    // Call NextAuth signOut to clear the session
+    await signOut({ callbackUrl: '/' });
   };
 
   return (
@@ -96,7 +98,7 @@ export function Navbar() {
                 // Profile Dropdown for Logged-in User
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="p-0 hover:bg-gray-400 rounded-full transition flex items-center justify-center w-10 h-10 bg-gray-700 overflow-hidden">
+                    <button className="p-0 cursor-pointer hover:bg-gray-400 rounded-full transition flex items-center justify-center w-10 h-10 bg-gray-700 overflow-hidden">
                       {user?.avatar?.url ? (
                         <img src={user.avatar.url} alt="Profile" className="w-full h-full object-cover rounded-full" />
                       ) : (

@@ -2,9 +2,23 @@
 import React from "react";
 import HostCard from "@/components/host/HostCard";
 import { useAuthStore } from "@/store/authStore";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 const page = () => {
-  const { user } = useAuthStore();
+  const router = useRouter();
+  const { user, isAuthenticated, hasHydrated } = useAuthStore();
+
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (!isAuthenticated) {
+      router.replace("/auth/login?next=/become-a-host");
+    }
+  }, [hasHydrated, isAuthenticated, router]);
+
+  if (!hasHydrated || !isAuthenticated) {
+    return null;
+  }
 
   if (user?.role !== "host") {
     return (

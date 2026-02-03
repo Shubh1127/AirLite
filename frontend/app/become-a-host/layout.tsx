@@ -10,7 +10,7 @@ export default function BecomeAHostLayout({
     <div className="flex flex-col h-full">
 
       {/* TOP BAR */}
-      <header className="flex justify-between items-center px-8 pt-4   shrink-0">
+      {/* <header className="flex justify-between items-center px-8 pt-4   shrink-0">
         <Link href="/">
           <img className="h-10 w-10" src="/image.png" alt="logo" />
         </Link>
@@ -20,7 +20,7 @@ export default function BecomeAHostLayout({
         >
           Exit
         </Link>
-      </header>
+      </header> */}
 
       {/* CONTENT */}
       <main className="flex-1 overflow-hidden">

@@ -174,7 +174,7 @@ export default function ReservePage() {
       }
 
       // Redirect to success page
-      router.push('/dashboard/trips');
+      router.push('/users/profile/reservation');
     } catch (err: any) {
       console.error('Reservation error:', err);
       setError(err.message || 'Failed to process reservation');

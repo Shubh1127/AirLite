@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Save, Upload, X } from 'lucide-react';
 import Link from 'next/link';
+import { listingsAPI } from '@/lib/listings';
 
 export default function EditListingPage() {
   const params = useParams();
@@ -12,6 +13,8 @@ export default function EditListingPage() {
   const { user } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isAutoFilling, setIsAutoFilling] = useState(false);
+  const lastLookupRef = useRef('');
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -55,6 +58,59 @@ export default function EditListingPage() {
   useEffect(() => {
     fetchListing();
   }, [params.id]);
+
+  useEffect(() => {
+    const zipCode = formData.address.zipCode.trim();
+    const city = formData.address.city.trim();
+    const state = formData.address.state.trim();
+    const country = formData.country.trim();
+
+    const lookupByZip = zipCode.length >= 4;
+    const lookupByCityState = !zipCode && Boolean(city && state);
+
+    if (!lookupByZip && !lookupByCityState) {
+      return;
+    }
+
+    const lookupKey = lookupByZip
+      ? `zip:${zipCode}|${country}`
+      : `city:${city}|${state}|${country}`;
+
+    if (lastLookupRef.current === lookupKey) {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      lastLookupRef.current = lookupKey;
+      setIsAutoFilling(true);
+      try {
+        const data = await listingsAPI.addressLookup({
+          zipCode: lookupByZip ? zipCode : undefined,
+          city: lookupByCityState ? city : undefined,
+          state: lookupByCityState ? state : undefined,
+          country: country || undefined,
+        });
+
+        if (data?.zipCode) {
+          handleAddressChange('zipCode', data.zipCode);
+        }
+        if (data?.city) {
+          handleAddressChange('city', data.city);
+        }
+        if (data?.state) {
+          handleAddressChange('state', data.state);
+        }
+      } catch (error) {
+        console.error('Address lookup failed:', error);
+      } finally {
+        setIsAutoFilling(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [formData.address.zipCode, formData.address.city, formData.address.state, formData.country]);
+
+  const isZipLocked = formData.address.zipCode.trim().length >= 4;
 
   const fetchListing = async () => {
     try {
@@ -192,7 +248,7 @@ export default function EditListingPage() {
         throw new Error(data.message || 'Failed to update listing');
       }
 
-      alert('Listing updated successfully!');
+      // alert('Listing updated successfully!');
       router.push('/users/profile/listings');
     } catch (error: any) {
       console.error('Error updating listing:', error);
@@ -338,6 +394,7 @@ export default function EditListingPage() {
                 type="text"
                 value={formData.address.city}
                 onChange={(e) => handleAddressChange('city', e.target.value)}
+                disabled={isZipLocked}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
               />
             </div>
@@ -349,6 +406,7 @@ export default function EditListingPage() {
                 type="text"
                 value={formData.address.state}
                 onChange={(e) => handleAddressChange('state', e.target.value)}
+                disabled={isZipLocked}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
               />
             </div>
@@ -364,6 +422,9 @@ export default function EditListingPage() {
               />
             </div>
           </div>
+          {isAutoFilling && (
+            <p className="text-xs text-gray-500">Auto-filling address…</p>
+          )}
         </div>
 
         {/* Guest Details */}
