@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { ListingGrid } from "@/components/listings/ListingGrid";
+import { ListingsGridSkeleton } from "@/components/listings/ListingSkeleton";
 import {
   Search,
   Minus,
@@ -1010,10 +1011,12 @@ export default function Home() {
       <main className="max-w-7xl mx-auto px-4 py-6">
         {/* Listings Section */}
         {loadingListings ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-neutral-600 mr-2" />
-            <span className="text-neutral-600">Loading listings...</span>
-          </div>
+          <>
+            <ListingsGridSkeleton count={4} withTitle={true} />
+            <section className="mt-16">
+              <ListingsGridSkeleton count={4} withTitle={true} />
+            </section>
+          </>
         ) : displayedListings.length > 0 ? (
           <section>
             <div className="flex items-center justify-between mb-8">
@@ -1085,52 +1088,6 @@ export default function Home() {
         )}
       </main>
 
-      {/* Bottom Navigation Bar - Mobile Only */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200">
-        <div className="h-16 flex items-center justify-center">
-          {/* CENTERED NAV RAIL */}
-          <div className="flex items-center justify-between w-full max-w-[360px] px-10">
-            {/* Explore */}
-            <button className="flex flex-col items-center gap-1">
-              <Search className="w-5 h-5 text-rose-500" />
-              <span className="text-xs font-medium text-rose-500">Explore</span>
-            </button>
-
-            {/* Wishlists */}
-
-            <Link href={"users/profile/wishlist"}>
-              <button className="flex flex-col items-center gap-1">
-                <Heart className="w-5 h-5 text-neutral-600" />
-                <span className="text-xs font-medium text-neutral-600">
-                  Wishlists
-                </span>
-              </button>
-            </Link>
-
-            {/* Trips (conditional) */}
-            {isAuthenticated && (
-              <Link href={"users/profile/past-trips"}>
-                <button className="flex flex-col items-center gap-1">
-                  <HomeIcon className="w-5 h-5 text-neutral-600" />
-                  <span className="text-xs font-medium text-neutral-600">
-                    Trips
-                  </span>
-                </button>
-              </Link>
-            )}
-
-            {/* Profile */}
-            <Link href="/users/profile">
-              <button className="flex flex-col items-center gap-1">
-                <User className="w-5 h-5 text-neutral-600" />
-                <span className="text-xs font-medium text-neutral-600">
-                  Profile
-                </span>
-              </button>
-            </Link>
-          </div>
-        </div>
-      </nav>
     </main>
   );
 }

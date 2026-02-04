@@ -4,27 +4,34 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
-import { Bell, Search, Heart, Home as HomeIcon, MessageCircle, User, Briefcase, CalendarCheck, ChevronLeft } from 'lucide-react';
+import { Bell, Search, Heart, Home as HomeIcon, MessageCircle, User, Briefcase, CalendarCheck, ChevronLeft, LogOut } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 export default function AboutMePage() {
   const router = useRouter();
-  const { user, isAuthenticated, hasHydrated, token } = useAuthStore();
+  const { user, isAuthenticated, hasHydrated, token, logout } = useAuthStore();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isProfileSheetOpen, setIsProfileSheetOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = () => {
+    setIsLoggingOut(true);
+    logout();
+    router.push('/');
+  };
 
   useEffect(() => {
     if (!hasHydrated) return;
 
-    if (!isAuthenticated) {
+    if (!isAuthenticated && !isLoggingOut) {
       router.push('/auth/login');
       return;
     }
 
     setProfile(user);
     setLoading(false);
-  }, [hasHydrated, isAuthenticated, router, user]);
+  }, [hasHydrated, isAuthenticated, router, user, isLoggingOut]);
 
   if (loading || !hasHydrated) {
     return (
@@ -80,6 +87,12 @@ export default function AboutMePage() {
           </div>
           <div className="text-sm font-semibold text-center">Reservations</div>
         </Link>
+        <Link href="/users/profile/wishlist" className="bg-white border border-neutral-200 rounded-2xl p-4 flex flex-col items-center gap-3 shadow-sm">
+          <div className="w-14 h-14 rounded-2xl bg-neutral-100 flex items-center justify-center">
+            <Heart className="w-6 h-6 text-neutral-700" />
+          </div>
+          <div className="text-sm font-semibold text-center">Wishlist</div>
+        </Link>
         {(user?.role === 'host' || user?.role === 'both') && (
           <Link href="/users/profile/listings" className="bg-white border border-neutral-200 rounded-2xl p-4 flex flex-col items-center gap-3 shadow-sm">
             <div className="w-14 h-14 rounded-2xl bg-neutral-100 flex items-center justify-center">
@@ -114,6 +127,18 @@ export default function AboutMePage() {
           </div>
           <span className="text-neutral-400">›</span>
         </Link>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center justify-between py-2 text-red-600 hover:text-red-700 transition"
+        >
+          <div className="flex items-center gap-3">
+            <span className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center">
+              <LogOut className="w-4 h-4 text-red-600" />
+            </span>
+            <span className="text-sm font-medium">Logout</span>
+          </div>
+          <span className="text-red-600">›</span>
+        </button>
       </div>
 
       <AnimatePresence>
@@ -192,29 +217,50 @@ export default function AboutMePage() {
           </motion.div>
         )}
       </AnimatePresence>
-
+      {/* Bottom Navigation Bar - Mobile Only */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200">
-        <div className="flex items-center justify-around h-16">
-          <Link href="/" className="flex flex-col items-center justify-center gap-1 flex-1 h-full hover:bg-neutral-50 transition">
-            <Search className="w-5 h-5 text-neutral-600" />
-            <span className="text-xs font-medium text-neutral-600">Explore</span>
-          </Link>
-          <button className="flex flex-col items-center justify-center gap-1 flex-1 h-full hover:bg-neutral-50 transition">
-            <Heart className="w-5 h-5 text-neutral-600" />
-            <span className="text-xs font-medium text-neutral-600">Wishlists</span>
-          </button>
-          <button className="flex flex-col items-center justify-center gap-1 flex-1 h-full hover:bg-neutral-50 transition">
-            <HomeIcon className="w-5 h-5 text-neutral-600" />
-            <span className="text-xs font-medium text-neutral-600">Trips</span>
-          </button>
-          <button className="flex flex-col items-center justify-center gap-1 flex-1 h-full hover:bg-neutral-50 transition">
-            <MessageCircle className="w-5 h-5 text-neutral-600" />
-            <span className="text-xs font-medium text-neutral-600">Messages</span>
-          </button>
-          <Link href="/users/profile" className="flex flex-col items-center justify-center gap-1 flex-1 h-full hover:bg-neutral-50 transition">
-            <User className="w-5 h-5 text-rose-500" />
-            <span className="text-xs font-medium text-rose-500">Profile</span>
-          </Link>
+        <div className="h-16 flex items-center justify-center">
+          {/* CENTERED NAV RAIL */}
+          <div className="flex items-center justify-between w-full max-w-[360px] px-10">
+            {/* Explore */}
+            <button className="flex flex-col items-center gap-1">
+              <Search className="w-5 h-5 text-rose-500" />
+              <span className="text-xs font-medium text-rose-500">Explore</span>
+            </button>
+
+            {/* Wishlists */}
+
+            <Link href={"users/profile/wishlist"}>
+              <button className="flex flex-col items-center gap-1">
+                <Heart className="w-5 h-5 text-neutral-600" />
+                <span className="text-xs font-medium text-neutral-600">
+                  Wishlists
+                </span>
+              </button>
+            </Link>
+
+            {/* Trips (conditional) */}
+            {isAuthenticated && (
+              <Link href={"users/profile/past-trips"}>
+                <button className="flex flex-col items-center gap-1">
+                  <HomeIcon className="w-5 h-5 text-neutral-600" />
+                  <span className="text-xs font-medium text-neutral-600">
+                    Trips
+                  </span>
+                </button>
+              </Link>
+            )}
+
+            {/* Profile */}
+            <Link href="/users/profile">
+              <button className="flex flex-col items-center gap-1">
+                <User className="w-5 h-5 text-neutral-600" />
+                <span className="text-xs font-medium text-neutral-600">
+                  Profile
+                </span>
+              </button>
+            </Link>
+          </div>
         </div>
       </nav>
 

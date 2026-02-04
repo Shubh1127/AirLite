@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { ImageGallery } from "@/components/listings/ImageGallery";
+import { ReservePanelSkeleton, ListingDetailSkeleton } from "@/components/listings/ListingSkeleton";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -277,9 +278,25 @@ export default function ListingDetailPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-8">
-        <div className="text-center">Loading...</div>
-      </div>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="min-h-screen bg-white"
+      >
+        {/* Desktop Skeleton */}
+        <div className="hidden lg:block max-w-6xl mx-auto px-12 pb-12">
+          <div className="h-96 bg-neutral-200 rounded-2xl mb-8 animate-pulse" />
+          <div className="space-y-6">
+            <div className="h-8 bg-neutral-200 rounded-md w-2/3 animate-pulse" />
+            <div className="h-4 bg-neutral-200 rounded-md w-1/2 animate-pulse" />
+            <div className="h-4 bg-neutral-200 rounded-md w-1/3 animate-pulse" />
+          </div>
+        </div>
+
+        {/* Mobile Skeleton */}
+        <ListingDetailSkeleton />
+      </motion.div>
     );
   }
 
@@ -325,10 +342,10 @@ export default function ListingDetailPage() {
 
   return (
     <motion.div
-      initial={{ x: '100%' }}
-      animate={{ x: 0 }}
-      exit={{ x: '100%' }}
-      transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
       className="min-h-screen bg-white"
     >
       {/* Mobile Back Button with Actions */}
@@ -421,6 +438,9 @@ export default function ListingDetailPage() {
       </div>
 
       {/* Mobile Content */}
+      {loading ? (
+        <ListingDetailSkeleton />
+      ) : (
       <div className="lg:hidden -mt-3 border border-t rounded-t-2xl bg-white px-5 pt-6 pb-24 relative z-10">
         {/* Title */}
         <h1 className="text-2xl font-bold mb-2">{listing.title}</h1>
@@ -447,6 +467,7 @@ export default function ListingDetailPage() {
           <Star className="w-4 h-4 fill-black" />
           <span className="font-semibold">{listing.rating?.toFixed(1) || '5.0'}</span>
           <span className="mx-1">·</span>
+
           <span className="underline font-medium">{listing.reviewCount || 3} reviews</span>
         </div>
 
@@ -688,6 +709,7 @@ export default function ListingDetailPage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Mobile Fixed Bottom Button */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 px-5 py-4 flex items-center justify-between z-30">
@@ -1954,11 +1976,19 @@ export default function ListingDetailPage() {
       <AnimatePresence>
         {showReservePanel && checkInDate && checkOutDate && (
           <>
-            {/* Overlay */}
-            <div 
-              className="fixed inset-0 bg-black/20 z-40 lg:hidden" 
-              onClick={() => setShowReservePanel(false)} 
-            />
+            {/* Show skeleton while loading */}
+            {loading ? (
+              <>
+                <div className="fixed inset-0 bg-black/20 z-40 lg:hidden" />
+                <ReservePanelSkeleton />
+              </>
+            ) : (
+              <>
+                {/* Overlay */}
+                <div 
+                  className="fixed inset-0 bg-black/20 z-40 lg:hidden" 
+                  onClick={() => setShowReservePanel(false)} 
+                />
             
             {/* Sliding Panel */}
             <motion.div
@@ -2095,6 +2125,8 @@ export default function ListingDetailPage() {
                 </Link>
               </div>
             </motion.div>
+              </>
+            )}
           </>
         )}
       </AnimatePresence>
