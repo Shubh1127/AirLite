@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
-import { Edit, Trash2, Eye, MapPin, Users } from 'lucide-react';
+import { Edit, Trash2, Eye, MapPin, Users, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 
 interface Listing {
   _id: string;
@@ -95,7 +96,21 @@ export default function ListingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <motion.div
+      initial={{ x: '100%' }}
+      animate={{ x: 0 }}
+      exit={{ x: '100%' }}
+      transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+      className="space-y-6"
+    >
+      {/* Mobile Back Button */}
+      <div className="lg:hidden sticky top-0 bg-white border-b border-neutral-200 px-4 py-3 flex items-center gap-3 z-10 -mx-4 -mt-6 mb-6">
+        <Link href="/users/profile" className="p-2 hover:bg-neutral-100 rounded-full transition">
+          <ChevronLeft className="w-6 h-6" />
+        </Link>
+        <h1 className="text-lg font-semibold">Listings</h1>
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-semibold text-gray-900">Your listings</h1>
@@ -220,6 +235,6 @@ export default function ListingsPage() {
           ))}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

@@ -2,7 +2,9 @@
 
 import { api } from "@/lib/api";
 import { listingsAPI } from "@/lib/listings";
-import { useParams, useSearchParams } from "next/navigation";
+import { wishlistAPI } from "@/lib/wishlist";
+import { useAuthStore } from "@/store/authStore";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import {
   Heart,
@@ -40,6 +42,7 @@ import {
   Minus,
   Plus,
   ChevronUp,
+  ChevronLeft,
 } from "lucide-react";
 import Link from "next/link";
 import { ImageGallery } from "@/components/listings/ImageGallery";
@@ -50,10 +53,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { format, formatDistanceToNow } from "date-fns";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function ListingDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const id = params.id as string;
   const [listing, setListing] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -72,8 +77,18 @@ export default function ListingDetailPage() {
   const [showCheckOutCalendar, setShowCheckOutCalendar] = useState(false);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
   const [showAllReviews, setShowAllReviews] = useState(false);
-  const mapContainer = useRef<HTMLDivElement>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showReservePanel, setShowReservePanel] = useState(false);
+  const [showChangeGuests, setShowChangeGuests] = useState(false);
+  const [showChangeDates, setShowChangeDates] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isInWishlist, setIsInWishlist] = useState(false);
+  const [isLoadingWishlist, setIsLoadingWishlist] = useState(false);
+  const mapContainerMobile = useRef<HTMLDivElement>(null);
+  const mapContainerDesktop = useRef<HTMLDivElement>(null);
   const map = useRef<any>(null);
+
+  const { isAuthenticated, token } = useAuthStore();
 
   // Calculate total guests
   const totalGuests = adults + children;
@@ -124,39 +139,113 @@ export default function ListingDetailPage() {
     }
   }, [id]);
 
+  // Fetch wishlist status
+  useEffect(() => {
+    const checkWishlistStatus = async () => {
+      if (!isAuthenticated || !token || !id) return;
+
+      try {
+        setIsLoadingWishlist(true);
+        const wishlistData = await wishlistAPI.getWishlist(token);
+        const inWishlist = wishlistData.listings?.some((listing: any) => listing._id === id);
+        setIsInWishlist(inWishlist || false);
+      } catch (error) {
+        console.error("Error checking wishlist status:", error);
+      } finally {
+        setIsLoadingWishlist(false);
+      }
+    };
+
+    checkWishlistStatus();
+  }, [isAuthenticated, token, id]);
+
+  // Toggle wishlist
+  const handleWishlistToggle = async () => {
+    if (!isAuthenticated || !token) {
+      router.push("/auth/login");
+      return;
+    }
+
+    try {
+      setIsLoadingWishlist(true);
+      if (isInWishlist) {
+        await wishlistAPI.removeFromWishlist(id, token);
+      } else {
+        await wishlistAPI.addToWishlist(id, token);
+      }
+      setIsInWishlist(!isInWishlist);
+    } catch (error) {
+      console.error("Error toggling wishlist:", error);
+    } finally {
+      setIsLoadingWishlist(false);
+    }
+  };
+
   // Initialize Mapbox map
   useEffect(() => {
-    if (!listing || !listing.mapboxToken || !listing.geometry || map.current)
-      return;
+    if (!listing || !listing.geometry || map.current) return;
+
+    // Determine which container is visible
+    const isMobile = window.innerWidth < 1024;
+    const activeContainer = isMobile ? mapContainerMobile.current : mapContainerDesktop.current;
+    
+    if (!activeContainer) return;
 
     const loadMapbox = async () => {
-      // Dynamically import mapbox-gl
-      const mapboxgl = (await import("mapbox-gl")).default;
+      try {
+        // Dynamically import mapbox-gl
+        const mapboxgl = (await import("mapbox-gl")).default;
 
-      // Add CSS
-      const link = document.createElement("link");
-      link.href = "https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css";
-      link.rel = "stylesheet";
-      document.head.appendChild(link);
+        // Set access token - use a fallback public token if mapboxToken is not available
+        const token = listing.mapboxToken || process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+        if (!token) {
+          console.warn("Mapbox token not found");
+          return;
+        }
 
-      mapboxgl.accessToken = listing.mapboxToken;
+        mapboxgl.accessToken = token;
 
-      const coordinates = listing.geometry.coordinates;
+        // Add CSS if not already added
+        if (!document.querySelector('link[href*="mapbox-gl"]')) {
+          const link = document.createElement("link");
+          link.href = "https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css";
+          link.rel = "stylesheet";
+          document.head.appendChild(link);
+        }
 
-      map.current = new mapboxgl.Map({
-        container: mapContainer.current!,
-        style: "mapbox://styles/mapbox/streets-v12",
-        center: [coordinates[0], coordinates[1]],
-        zoom: 12,
-      });
+        const coordinates = listing.geometry.coordinates;
 
-      // Add marker
-      new mapboxgl.Marker({ color: "#FF385C" })
-        .setLngLat([coordinates[0], coordinates[1]])
-        .addTo(map.current);
+        if (!coordinates || coordinates.length < 2) {
+          console.warn("Invalid coordinates");
+          return;
+        }
 
-      // Add navigation controls
-      map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
+        // Ensure the container has dimensions
+        if (activeContainer) {
+          activeContainer.style.width = '100%';
+          activeContainer.style.height = activeContainer.style.height || '320px';
+        }
+
+        map.current = new mapboxgl.Map({
+          container: activeContainer!,
+          style: "mapbox://styles/mapbox/streets-v12",
+          center: [coordinates[0], coordinates[1]],
+          zoom: 12,
+          trackResize: true,
+        });
+
+        // Add marker
+        new mapboxgl.Marker({ color: "#FF385C" })
+          .setLngLat([coordinates[0], coordinates[1]])
+          .addTo(map.current);
+
+        // Add navigation controls
+        map.current.addControl(new mapboxgl.NavigationControl(), "top-right");
+
+        console.log("Map loaded successfully on", isMobile ? "mobile" : "desktop");
+      } catch (error) {
+        console.error("Error loading map:", error);
+      }
     };
 
     loadMapbox();
@@ -235,76 +324,442 @@ export default function ListingDetailPage() {
 
 
   return (
-    <div className="max-w-5xl mx-auto px-12 py-6">
-      {/* Title and Action Buttons */}
-      <div className="mb-4 flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-semibold mb-2">{listing.title}</h1>
+    <motion.div
+      initial={{ x: '100%' }}
+      animate={{ x: 0 }}
+      exit={{ x: '100%' }}
+      transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+      className="min-h-screen bg-white"
+    >
+      {/* Mobile Back Button with Actions */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 bg-transparent z-20 px-4 py-3 flex items-center justify-between">
+        <button onClick={() => router.back()} className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md">
+          <ChevronLeft className="w-6 h-6" />
+        </button>
+        <div className="flex items-center gap-2">
+          <button className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md">
+            <Share2 className="w-5 h-5" />
+          </button>
+          <button 
+            onClick={handleWishlistToggle}
+            disabled={isLoadingWishlist}
+            className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md hover:shadow-lg transition disabled:opacity-50"
+          >
+            <Heart 
+              className={`w-5 h-5 transition-colors ${
+                isInWishlist ? 'fill-rose-500 text-rose-500' : 'text-gray-600'
+              }`}
+            />
+          </button>
         </div>
-        <div className="flex items-center justify-between">
-          {/* <div className="flex items-center gap-4 text-sm">
-            <span className="flex items-center gap-1">
-              <Star className="w-4 h-4 fill-black" />
-              {listing.rating?.toFixed(2) || '4.93'}
-            </span>
-            <span className="underline">{listing.reviewCount || 72} Reviews</span>
-            <span className="flex items-center gap-1">
-              <MapPin className="w-4 h-4" />
-              {listing.location}, {listing.country || 'India'}
-            </span>
-          </div> */}
+      </div>
+
+      {/* Mobile Image Gallery - Horizontal Scroll */}
+      <div className="lg:hidden relative ">
+        <div 
+          className="overflow-x-auto scrollbar-hide snap-x snap-mandatory"
+          onScroll={(e) => {
+            const scrollLeft = e.currentTarget.scrollLeft;
+            const itemWidth = e.currentTarget.offsetWidth;
+            const index = Math.round(scrollLeft / itemWidth);
+            setCurrentImageIndex(index);
+          }}
+        >
+          <div className="flex">
+            {listing.images?.map((image: any, index: number) => (
+              <div key={index} className="flex-shrink-0 w-full snap-center">
+                <img
+                  src={image.url || image}
+                  alt={`${listing.title} - ${index + 1}`}
+                  className="w-full h-80 object-cover"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Image Counter */}
+        <div className="absolute bottom-4 right-4 bg-black/70 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+          {currentImageIndex + 1} / {listing.images?.length || 0}
+        </div>
+      </div>
+
+      {/* Desktop Layout */}
+      <div className="hidden lg:block max-w-6xl mx-auto px-12 py-6">
+        {/* Desktop Back Button */}
+        <div className="flex items-center gap-3 mb-6">
+          <button onClick={() => router.back()} className="p-2 hover:bg-neutral-100 rounded-full transition border border-neutral-200">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Title and Action Buttons */}
+        <div className="mb-4 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-semibold mb-2">{listing.title}</h1>
+          </div>
           <div className="flex items-center gap-4">
-            <button className="flex items-center gap-2 underline text-sm">
+            <button className="flex items-center gap-2 underline text-sm hover:bg-neutral-50 px-3 py-2 rounded-lg">
               <Share2 className="w-4 h-4" /> Share
             </button>
-            <button className="flex items-center gap-2 underline text-sm">
-              <Heart className="w-4 h-4" /> Save
+            <button 
+              onClick={handleWishlistToggle}
+              disabled={isLoadingWishlist}
+              className="flex items-center gap-2 underline text-sm hover:bg-neutral-50 px-3 py-2 rounded-lg disabled:opacity-50 transition"
+            >
+              <Heart 
+                className={`w-4 h-4 transition-colors ${
+                  isInWishlist ? 'fill-rose-500 text-rose-500' : 'text-gray-600'
+                }`}
+              /> 
+              {isInWishlist ? 'Saved' : 'Save'}
             </button>
+          </div>
+        </div>
+
+        {/* Desktop Image Gallery */}
+        <ImageGallery images={listing.images} title={listing.title} />
+      </div>
+
+      {/* Mobile Content */}
+      <div className="lg:hidden -mt-3 border border-t rounded-t-2xl bg-white px-5 pt-6 pb-24 relative z-10">
+        {/* Title */}
+        <h1 className="text-2xl font-bold mb-2">{listing.title}</h1>
+        
+        {/* Subtitle */}
+        <p className="text-neutral-600 mb-3">
+          {listing.category && `${listing.category.charAt(0).toUpperCase() + listing.category.slice(1)} in `}
+          {listing.location}, {listing.country || 'India'}
+        </p>
+
+        {/* Property Details */}
+        <div className="flex items-center text-neutral-700 text-sm mb-4">
+          <span>{listing.maxGuests} {listing.maxGuests === 1 ? 'guest' : 'guests'}</span>
+          <span className="mx-1">·</span>
+          <span>{listing.bedrooms} {listing.bedrooms === 1 ? 'bedroom' : 'bedrooms'}</span>
+          <span className="mx-1">·</span>
+          <span>{listing.beds} {listing.beds === 1 ? 'bed' : 'beds'}</span>
+          <span className="mx-1">·</span>
+          <span>{listing.bathrooms} {listing.bathrooms === 1 ? 'bathroom' : 'bathrooms'}</span>
+        </div>
+
+        {/* Rating */}
+        <div className="flex items-center gap-1 mb-6 pb-6 border-b border-neutral-200">
+          <Star className="w-4 h-4 fill-black" />
+          <span className="font-semibold">{listing.rating?.toFixed(1) || '5.0'}</span>
+          <span className="mx-1">·</span>
+          <span className="underline font-medium">{listing.reviewCount || 3} reviews</span>
+        </div>
+
+        {/* Host Section */}
+        <div className="flex items-center gap-4 mb-6 pb-6 border-b border-neutral-200 rounded-lg lg:rounded-none px-4 lg:px-0 py-4 lg:py-0 bg-neutral-50 lg:bg-transparent">
+          <div className="relative">
+            <img
+              src={listing.hostDetails?.avatar?.url || "https://upload.wikimedia.org/wikipedia/commons/9/99/Sample_User_Icon.png"}
+              alt="Host"
+              className="w-12 h-12 rounded-full"
+            />
+            {listing.hostDetails?.hostStats?.isSuperhost && (
+              <div className="absolute -bottom-1 -right-1 bg-rose-500 rounded-full p-1">
+                <Star className="w-3 h-3 fill-white text-white" />
+              </div>
+            )}
+          </div>
+          <div>
+            <h3 className="font-semibold">
+              Hosted by {listing.hostDetails?.fullName || listing.hostDetails?.firstName || "Host"}
+            </h3>
+            <p className="text-sm text-neutral-500">
+              {listing.hostDetails?.hostStats?.yearsAsHost || 5} years hosting
+            </p>
+          </div>
+        </div>
+
+        {/* Features */}
+        <div className="space-y-6 mb-6 pb-6 border-b border-neutral-200 rounded-lg lg:rounded-none px-4 lg:px-0 py-4 lg:py-0 bg-neutral-50 lg:bg-transparent">
+          {/* Self check-in */}
+          <div className="flex items-start gap-4">
+            <div className="w-6 h-6 flex-shrink-0">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-1">Self check-in</h4>
+              <p className="text-sm text-neutral-600">You can check in with the building staff.</p>
+            </div>
+          </div>
+
+          {/* Location */}
+          <div className="flex items-start gap-4">
+            <MapPin className="w-6 h-6 flex-shrink-0" />
+            <div>
+              <h4 className="font-semibold mb-1">Unbeatable location</h4>
+              <p className="text-sm text-neutral-600">100% of recent guests gave the location a 5-star rating.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Add dates section */}
+        <div className="mb-6">
+          <h3 className="font-semibold text-lg mb-2">Add dates for prices</h3>
+          <div className="flex items-center gap-1 mb-4">
+            <Star className="w-4 h-4 fill-black" />
+            <span className="font-semibold">{listing.rating?.toFixed(1) || '5.0'}</span>
+          </div>
+        </div>
+
+        {/* Amenities Section */}
+        {listing.amenities && listing.amenities.length > 0 && (
+          <div className="mb-8 pb-8 border-b border-neutral-200">
+            <h3 className="text-xl font-semibold mb-6">What this place offers</h3>
+            <div className="space-y-4">
+              {listing.amenities.slice(0, 5).map((amenity: string, index: number) => {
+                const IconComponent = amenityIcons[amenity.toLowerCase()] || Home;
+                return (
+                  <div key={index} className="flex items-center gap-3">
+                    <IconComponent className="w-5 h-5 text-neutral-600" />
+                    <span className="capitalize text-neutral-700">{amenity}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {listing.amenities.length > 5 && (
+              <button 
+                onClick={() => setShowAllAmenities(true)}
+                className="mt-6 w-full border border-neutral-300 rounded-lg py-3 font-semibold text-neutral-700 hover:bg-neutral-50">
+                Show all {listing.amenities.length} amenities
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Reviews Section */}
+        {listing.reviews && listing.reviews.length > 0 && (
+          <div className="mb-8 pb-8 border-b border-neutral-200">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-xl font-semibold">Reviews</h3>
+              </div>
+              <div className="text-right">
+                <div className="flex items-center gap-2">
+                  <Star className="w-4 h-4 fill-black" />
+                  <span className="font-semibold">{listing.rating?.toFixed(1) || '5.0'}</span>
+                  <span className="text-neutral-600">· {listing.reviewCount || 0} reviews</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              {listing.reviews.slice(0, 3).map((review: any, index: number) => {
+                const timeAgo = review.createdAt
+                  ? formatDistanceToNow(new Date(review.createdAt), { addSuffix: true })
+                  : "Recently";
+
+                return (
+                  <div key={review._id || index} className="pb-6 border-b border-neutral-200 last:border-0">
+                    <div className="flex items-center gap-3 mb-3">
+                      <img
+                        src={
+                          review.author?.avatar?.url ||
+                          "https://upload.wikimedia.org/wikipedia/commons/9/99/Sample_User_Icon.png"
+                        }
+                        alt="Reviewer"
+                        className="w-10 h-10 rounded-full"
+                      />
+                      <div>
+                        <h4 className="font-semibold text-sm">
+                          {review.author?.firstName || "Guest"}
+                        </h4>
+                        <p className="text-xs text-neutral-500">{timeAgo}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 mb-2">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`w-3 h-3 ${
+                            i < Math.floor(review.rating)
+                              ? "fill-black"
+                              : "fill-none stroke-black"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-sm text-neutral-700">{review.comment}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {listing.reviews.length > 3 && (
+              <button onClick={() => setShowAllReviews(true)} className="mt-6 w-full border border-neutral-300 rounded-lg py-3 font-semibold text-neutral-700 hover:bg-neutral-50">
+                Show all {listing.reviewCount || listing.reviews.length} reviews
+              </button>
+            )}
+          </div>
+        )}
+        {/* Where you'll be */}
+        <div className="mb-8 pb-8 border-b border-neutral-200">
+          <h3 className="text-xl font-semibold mb-4">Where you'll be</h3>
+          <p className="text-neutral-700 mb-4">
+            {listing.location}, {listing.country || 'India'}
+          </p>
+          <div
+            ref={mapContainerMobile}
+            className="w-full h-80 bg-neutral-200 rounded-lg overflow-hidden mb-4"
+            style={{ minHeight: '320px' }}
+          />
+          <p className="text-xs text-neutral-600">
+            Exact location provided after booking
+          </p>
+        </div>
+
+        {/* Meet your host */}
+        <div className="mb-8 pb-8 border-b border-neutral-200">
+          <h3 className="text-xl font-semibold mb-6">Meet your host</h3>
+          <div className="flex items-start gap-4 mb-6">
+            <div className="relative">
+              {listing.hostDetails?.avatar?.url ? (
+                <img
+                  src={listing.hostDetails.avatar.url}
+                  alt="Host"
+                  className="w-16 h-16 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-neutral-300 flex items-center justify-center text-white text-2xl font-bold">
+                  {listing.hostDetails?.firstName
+                    ? listing.hostDetails.firstName.charAt(0).toUpperCase()
+                    : "H"}
+                </div>
+              )}
+            </div>
+            <div className="flex-1">
+              <h4 className="font-semibold text-lg">
+                {listing.hostDetails?.fullName || listing.hostDetails?.firstName || "Host"}
+              </h4>
+              {listing.hostDetails?.hostStats?.isSuperhost && (
+                <p className="text-sm text-neutral-600 mb-2">Superhost</p>
+              )}
+              <p className="text-sm text-neutral-600">
+                {listing.hostDetails?.hostStats?.yearsAsHost || 5} years hosting
+              </p>
+            </div>
+          </div>
+          <p className="text-sm text-neutral-700 mb-6">
+            {listing.hostDetails?.hostProfile?.about ||
+              "A passionate host committed to providing great experiences."}
+          </p>
+          <button className="w-full bg-neutral-100 text-neutral-900 px-6 py-3 rounded-lg font-semibold hover:bg-neutral-200">
+            Message host
+          </button>
+        </div>
+
+        {/* Things to know */}
+        <div className="mb-8">
+          <h3 className="text-xl font-semibold mb-6">Things to know</h3>
+          <div className="space-y-6">
+            <div>
+              <h4 className="font-semibold mb-2 flex items-center gap-2">
+                <span>📅</span> Cancellation policy
+              </h4>
+              <p className="text-sm text-neutral-700">
+                {listing.cancellationPolicy?.description || "See host's cancellation policy for details."}
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2 flex items-center gap-2">
+                <span>🔍</span> House rules
+              </h4>
+              <p className="text-sm text-neutral-700">
+                {listing.houseRules && listing.houseRules.length > 0
+                  ? listing.houseRules.join(", ")
+                  : "No specific house rules listed."}
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2 flex items-center gap-2">
+                <span>🛡️</span> Safety & property
+              </h4>
+              <p className="text-sm text-neutral-700">
+                This property has a carbon monoxide detector and a fire extinguisher.
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Image Gallery */}
-      <ImageGallery images={listing.images} title={listing.title} />
-      {bigImage && (
-        <div className="absolute h-96 w-96 top-50 left-20 ">
-          <img
-            className="w-full h-full object-cover rounded-lg "
-            src={listing.images[0]}
-          />
-        </div>
-      )}
-      {/* Listing Overview */}
-       <div className="pb-8 border-b flex justify-between items-center">
-            <div>
-              <h2 className="text-xl font-semibold mb-2">
-                Entire rental unit in {listing.location},{" "}
-                {listing.country || "India"}
-              </h2>
-              <div className="flex items-center gap-1 text-black">
-                <span>{listing.maxGuests} guests</span>·
-                <span>{listing.bedrooms} bedroom</span>·
-                <span>{listing.beds} bed</span>·
-                <span>{listing.bathrooms} bathroom</span>
+      {/* Mobile Fixed Bottom Button */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 px-5 py-4 flex items-center justify-between z-30">
+        <div>
+          {checkInDate && checkOutDate ? (
+            <>
+              <p className="text-sm text-neutral-600">
+                {format(checkInDate, 'MMM d')} - {format(checkOutDate, 'MMM d')}
+              </p>
+              <p className="text-sm font-semibold">
+                ₹{(listing.pricePerNight * calculateNights()).toLocaleString()} total
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-neutral-600">Add dates for prices</p>
+              <div className="flex items-center gap-1">
+                <Star className="w-3 h-3 fill-black" />
+                <span className="text-sm font-semibold">{listing.rating?.toFixed(1) || '5.0'}</span>
               </div>
-            </div>
-            <div className="">
-              <h1
-                className="flex w-max  text-[14px] py-5 items-center gap-2 bg-white 
-                rounded-xl 
-               
-                shadow-[6px_8px_20px_rgba(0.7,0.08,0.08,0.1)] p-3 px-12 font-semibold"
-              >
-                <span>
-                  <Tag className="text-rose-500" size={20} />
-                </span>{" "}
-                Prices include all fees
-              </h1>
+            </>
+          )}
+        </div>
+        {checkInDate && checkOutDate ? (
+          <button
+            onClick={() => setShowReservePanel(true)}
+            className="bg-rose-500 hover:bg-rose-600 text-white px-8 py-3 rounded-lg font-semibold transition"
+          >
+            Reserve
+          </button>
+        ) : (
+          <button
+            onClick={() => setShowDatePicker(true)}
+            className="bg-rose-500 hover:bg-rose-600 text-white px-8 py-3 rounded-lg font-semibold transition"
+          >
+            Check availability
+          </button>
+        )}
+      </div>
+
+      {/* Desktop Content - Keep existing layout */}
+      <div className="hidden lg:block max-w-6xl mx-auto px-12 pb-12">
+        <div className="pb-8 border-b flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-semibold mb-2">
+              Entire rental unit in {listing.location},{" "}
+              {listing.country || "India"}
+            </h2>
+            <div className="flex items-center gap-1 text-black">
+              <span>{listing.maxGuests} guests</span>·
+              <span>{listing.bedrooms} bedroom</span>·
+              <span>{listing.beds} bed</span>·
+              <span>{listing.bathrooms} bathroom</span>
             </div>
           </div>
+          <div className="">
+            <h1
+              className="flex w-max  text-[14px] py-5 items-center gap-2 bg-white 
+              rounded-xl 
+             
+              shadow-[6px_8px_20px_rgba(0.7,0.08,0.08,0.1)] p-3 px-12 font-semibold"
+            >
+              <span>
+                <Tag className="text-rose-500" size={20} />
+              </span>{" "}
+              Prices include all fees
+            </h1>
+          </div>
+        </div>
 
-      {/* Main Content - Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3  gap-16">
+        {/* Main Content - Two Column Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-16">
         {/* Left Section - Scrollable */}
         <div className="lg:col-span-2">
           {/* Room Details */}
@@ -742,7 +1197,7 @@ export default function ListingDetailPage() {
 
       {/* Full Width Sections */}
       {/* Reviews Section */}
-      <div className="mt-12 pt-12 border-t">
+      <div className="mt-12 pt-12 border-t hidden lg:block">
         {/* Guest Favourite Header */}
         <div className="text-center mb-12">
           <div className="flex items-up justify-center gap-4 mb-4">
@@ -965,8 +1420,9 @@ export default function ListingDetailPage() {
           {listing.location}, {listing.country}
         </p>
         <div
-          ref={mapContainer}
+          ref={mapContainerDesktop}
           className="w-full h-96 bg-gray-200 rounded-lg overflow-hidden"
+          style={{ minHeight: '400px' }}
         />
         <p className="text-sm text-gray-600 mt-4">
           Exact location provided after booking
@@ -1162,127 +1618,712 @@ export default function ListingDetailPage() {
           </div>
         </div>
       </div>
+      </div>
 
       {/* Amenities Modal */}
-      {showAllAmenities && (
-        <div className="fixed inset-0 bg-black/75  bg-opacity-50 z-50 flex items-center border-2  border-black justify-center p-4">
-          <div className="bg-white border-4  rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white">
-              <h2 className="text-2xl font-semibold">What this place offers</h2>
-              <button
-                onClick={() => setShowAllAmenities(false)}
-                className="p-2 hover:bg-gray-100 rounded-full transition"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            {/* Amenities Grid */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {listing.amenities?.map((amenity: string, index: number) => {
-                  const IconComponent =
-                    amenityIcons[amenity.toLowerCase()] || Home;
-                  return (
-                    <div
-                      key={index}
-                      className="flex items-center gap-4 py-4 border-b"
-                    >
-                      <IconComponent className="w-6 h-6" />
-                      <span className="capitalize">{amenity}</span>
-                    </div>
-                  );
-                })}
+      <AnimatePresence>
+        {showAllAmenities && (
+          <>
+            {/* Mobile Overlay */}
+            <div className="lg:hidden fixed inset-0 bg-black/20 z-40" onClick={() => setShowAllAmenities(false)} />
+            
+            {/* Mobile Sliding Panel */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+              className="lg:hidden fixed inset-y-0 right-0 bg-white z-50 w-full max-w-full overflow-y-auto"
+            >
+              {/* Header */}
+              <div className="sticky top-0 bg-white border-b border-neutral-200 px-5 py-4 flex items-center gap-3 z-10">
+                <button onClick={() => setShowAllAmenities(false)} className="p-2 hover:bg-neutral-100 rounded-full transition">
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <h2 className="text-lg font-semibold">What this place offers</h2>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Reviews Modal */}
-      {showAllReviews && (
-        <div className="fixed inset-0 bg-black/75 bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white">
-              <h2 className="text-2xl font-semibold">All reviews</h2>
-              <button
-                onClick={() => setShowAllReviews(false)}
-                className="p-2 hover:bg-gray-100 rounded-full transition"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            {/* Reviews Grid */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-              {listing.reviews && listing.reviews.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {listing.reviews.map((review: any, index: number) => {
-                    const memberSince = review.author?.createdAt
-                      ? new Date(review.author.createdAt).getFullYear()
-                      : new Date().getFullYear();
-                    const yearsSince = new Date().getFullYear() - memberSince;
-                    const timeAgo = review.createdAt
-                      ? formatDistanceToNow(new Date(review.createdAt), {
-                          addSuffix: true,
-                        })
-                      : "Recently";
-
+              {/* Amenities List */}
+              <div className="p-5 pb-24">
+                <div className="space-y-4">
+                  {listing.amenities?.map((amenity: string, index: number) => {
+                    const IconComponent = amenityIcons[amenity.toLowerCase()] || Home;
                     return (
-                      <div key={review._id || index}>
-                        <div className="flex items-center gap-4 mb-3">
-                          <img
-                            src={
-                              review.author?.avatar?.url ||
-                              "https://upload.wikimedia.org/wikipedia/commons/9/99/Sample_User_Icon.png"
-                            }
-                            alt="Reviewer"
-                            className="w-12 h-12 rounded-full object-cover"
-                          />
-                          <div>
-                            <h4 className="font-semibold">
-                              {review.author?.firstName || "Anonymous"}
-                            </h4>
-                            <p className="text-sm text-gray-600">
-                              {yearsSince > 0
-                                ? `${yearsSince} ${yearsSince === 1 ? "year" : "years"} on Airbnb`
-                                : "New to Airbnb"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 mb-2">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`w-3 h-3 ${
-                                i < Math.floor(review.rating)
-                                  ? "fill-black"
-                                  : "fill-none stroke-black"
-                              }`}
-                            />
-                          ))}
-                          <span className="text-sm text-gray-600">
-                            · {timeAgo}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-700">
-                          {review.comment}
-                        </p>
+                      <div key={index} className="flex items-center gap-4 py-4 border-b border-neutral-200 last:border-0">
+                        <IconComponent className="w-6 h-6 text-neutral-600 flex-shrink-0" />
+                        <span className="capitalize text-neutral-700">{amenity}</span>
                       </div>
                     );
                   })}
                 </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  No reviews yet. Be the first to review!
+              </div>
+            </motion.div>
+
+            {/* Desktop Modal */}
+            <div className="hidden lg:flex fixed inset-0 bg-black/75 bg-opacity-50 z-50 items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+                className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white">
+                  <h2 className="text-2xl font-semibold">What this place offers</h2>
+                  <button
+                    onClick={() => setShowAllAmenities(false)}
+                    className="p-2 hover:bg-gray-100 rounded-full transition"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
                 </div>
-              )}
+
+                {/* Amenities Grid */}
+                <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {listing.amenities?.map((amenity: string, index: number) => {
+                      const IconComponent =
+                        amenityIcons[amenity.toLowerCase()] || Home;
+                      return (
+                        <div
+                          key={index}
+                          className="flex items-center gap-4 py-4 border-b"
+                        >
+                          <IconComponent className="w-6 h-6" />
+                          <span className="capitalize">{amenity}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </motion.div>
             </div>
-          </div>
-        </div>
-      )}
-    </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Reviews Modal */}
+      <AnimatePresence>
+        {showAllReviews && (
+          <>
+            {/* Mobile Overlay */}
+            <div className="lg:hidden fixed inset-0 bg-black/20 z-40" onClick={() => setShowAllReviews(false)} />
+            
+            {/* Mobile Sliding Panel */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+              className="lg:hidden fixed inset-y-0 right-0 bg-white z-50 w-full max-w-full overflow-y-auto"
+            >
+              {/* Header */}
+              <div className="sticky top-0 bg-white border-b border-neutral-200 px-5 py-4 flex items-center gap-3 z-10">
+                <button onClick={() => setShowAllReviews(false)} className="p-2 hover:bg-neutral-100 rounded-full transition">
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <h2 className="text-lg font-semibold">All reviews</h2>
+              </div>
+
+              {/* Reviews List */}
+              <div className="p-5 pb-24">
+                <div className="space-y-6">
+                  {listing.reviews && listing.reviews.length > 0 ? (
+                    listing.reviews.map((review: any, index: number) => {
+                      const timeAgo = review.createdAt
+                        ? formatDistanceToNow(new Date(review.createdAt), { addSuffix: true })
+                        : "Recently";
+
+                      return (
+                        <div key={review._id || index} className="pb-6 border-b border-neutral-200 last:border-0">
+                          <div className="flex items-center gap-3 mb-3">
+                            <img
+                              src={review.author?.avatar?.url || "https://upload.wikimedia.org/wikipedia/commons/9/99/Sample_User_Icon.png"}
+                              alt="Reviewer"
+                              className="w-10 h-10 rounded-full"
+                            />
+                            <div>
+                              <h4 className="font-semibold text-sm">
+                                {review.author?.firstName || "Guest"}
+                              </h4>
+                              <p className="text-xs text-neutral-500">{timeAgo}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 mb-2">
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`w-3 h-3 ${
+                                  i < Math.floor(review.rating)
+                                    ? "fill-black"
+                                    : "fill-none stroke-black"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <p className="text-sm text-neutral-700">{review.comment}</p>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-8 text-neutral-500">
+                      No reviews yet. Be the first to review!
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Desktop Modal */}
+            <div className="hidden lg:flex fixed inset-0 bg-black/75 bg-opacity-50 z-50 items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+                className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white">
+                  <h2 className="text-2xl font-semibold">All reviews</h2>
+                  <button
+                    onClick={() => setShowAllReviews(false)}
+                    className="p-2 hover:bg-gray-100 rounded-full transition"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                {/* Reviews Grid */}
+                <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                  {listing.reviews && listing.reviews.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      {listing.reviews.map((review: any, index: number) => {
+                        const memberSince = review.author?.createdAt
+                          ? new Date(review.author.createdAt).getFullYear()
+                          : new Date().getFullYear();
+                        const yearsSince = new Date().getFullYear() - memberSince;
+                        const timeAgo = review.createdAt
+                          ? formatDistanceToNow(new Date(review.createdAt), {
+                              addSuffix: true,
+                            })
+                          : "Recently";
+
+                        return (
+                          <div key={review._id || index}>
+                            <div className="flex items-center gap-4 mb-3">
+                              <img
+                                src={review.author?.avatar?.url || "https://upload.wikimedia.org/wikipedia/commons/9/99/Sample_User_Icon.png"}
+                                alt="Reviewer"
+                                className="w-12 h-12 rounded-full object-cover"
+                              />
+                              <div>
+                                <h4 className="font-semibold">
+                                  {review.author?.firstName || "Anonymous"}
+                                </h4>
+                                <p className="text-sm text-gray-600">
+                                  {yearsSince > 0
+                                    ? `${yearsSince} ${yearsSince === 1 ? "year" : "years"} on Airbnb`
+                                    : "New to Airbnb"}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 mb-2">
+                              {[...Array(5)].map((_, i) => (
+                                <Star
+                                  key={i}
+                                  className={`w-3 h-3 ${
+                                    i < Math.floor(review.rating)
+                                      ? "fill-black"
+                                      : "fill-none stroke-black"
+                                  }`}
+                                />
+                              ))}
+                              <span className="text-sm text-gray-600">
+                                · {timeAgo}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-700">
+                              {review.comment}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      No reviews yet. Be the first to review!
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Date Picker Modal */}
+      <AnimatePresence>
+        {showDatePicker && (
+          <>
+            {/* Overlay */}
+            <div 
+              className="fixed inset-0 bg-black/20 z-40" 
+              onClick={() => setShowDatePicker(false)} 
+            />
+            
+            {/* Sliding Panel */}
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+              className="fixed inset-x-0 bottom-0 bg-white z-50 rounded-t-2xl max-h-[90vh] overflow-y-auto"
+            >
+              {/* Header */}
+              <div className="sticky top-0 bg-white border-b border-neutral-200 px-5 py-4 flex items-center justify-between z-10">
+                <button 
+                  onClick={() => setShowDatePicker(false)} 
+                  className="p-2 hover:bg-neutral-100 rounded-full transition"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+                <h2 className="text-lg font-semibold absolute left-1/2 -translate-x-1/2">Select check-in date</h2>
+                <button 
+                  onClick={() => {
+                    setCheckInDate(undefined);
+                    setCheckOutDate(undefined);
+                  }}
+                  className="text-sm font-semibold underline"
+                >
+                  Clear dates
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-5">
+                <p className="text-sm text-neutral-600 mb-6">Add your travel dates for exact pricing</p>
+
+                {/* Calendar */}
+                <Calendar
+                  mode="range"
+                  selected={{
+                    from: checkInDate,
+                    to: checkOutDate,
+                  }}
+                  onSelect={(range) => {
+                    if (range?.from) {
+                      setCheckInDate(range.from);
+                      setCheckOutDate(range.to);
+                    }
+                  }}
+                  numberOfMonths={3}
+                  className="rounded-md"
+                  disabled={(date) => date < new Date()}
+                />
+              </div>
+
+              {/* Footer */}
+              <div className="sticky bottom-0 bg-white border-t border-neutral-200 px-5 py-4 flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-neutral-600">Add dates for prices</p>
+                  <div className="flex items-center gap-1">
+                    <Star className="w-3 h-3 fill-black" />
+                    <span className="text-sm font-semibold">{listing.rating?.toFixed(1) || '5.0'}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    if (checkInDate && checkOutDate) {
+                      setShowDatePicker(false);
+                    }
+                  }}
+                  disabled={!checkInDate || !checkOutDate}
+                  className="bg-neutral-800 hover:bg-black text-white px-8 py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Save
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Reserve Confirmation Panel */}
+      <AnimatePresence>
+        {showReservePanel && checkInDate && checkOutDate && (
+          <>
+            {/* Overlay */}
+            <div 
+              className="fixed inset-0 bg-black/20 z-40 lg:hidden" 
+              onClick={() => setShowReservePanel(false)} 
+            />
+            
+            {/* Sliding Panel */}
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+              className="fixed inset-x-0 bottom-0 bg-white z-50 rounded-t-2xl max-h-[95vh] overflow-y-auto lg:hidden"
+            >
+              {/* Header */}
+              <div className="sticky top-0 bg-white border-b border-neutral-200 px-5 py-4 flex items-center justify-between z-10">
+                <h2 className="text-xl font-semibold">Confirm and pay</h2>
+                <button 
+                  onClick={() => setShowReservePanel(false)} 
+                  className="p-2 hover:bg-neutral-100 rounded-full transition"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-5 pb-32">
+                {/* Listing Card */}
+                <div className="border border-neutral-200 rounded-lg overflow-hidden mb-6">
+                  <div className="relative h-40 bg-neutral-200">
+                    {listing.images && listing.images.length > 0 && (
+                      <img 
+                        src={listing.images[0]?.url || ''} 
+                        alt={listing.title}
+                        className="w-full h-full object-cover"
+                      />
+                    )}
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-semibold mb-1">{listing.title}</h3>
+                    <p className="text-sm text-neutral-600 mb-2">{listing.location}, {listing.country || 'India'}</p>
+                    <div className="flex items-center gap-1">
+                      <Star className="w-4 h-4 fill-black" />
+                      <span className="text-sm font-semibold">{listing.rating?.toFixed(1) || '5.0'}</span>
+                      <span className="text-sm text-neutral-600">({listing.reviewCount || 0})</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Dates */}
+                <div className="border-b border-neutral-200 py-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-neutral-600">Dates</p>
+                    <p className="font-semibold">{format(checkInDate, 'd')}–{format(checkOutDate, 'd')} {format(checkOutDate, 'MMM yyyy')}</p>
+                  </div>
+                  <button 
+                    onClick={() => setShowChangeDates(true)}
+                    className="text-sm font-semibold underline hover:bg-neutral-50 px-3 py-2 rounded"
+                  >
+                    Change
+                  </button>
+                </div>
+
+                {/* Guests */}
+                <div className="border-b border-neutral-200 py-4 flex items-center justify-between">
+               <div>
+                   <p className="text-sm text-neutral-600">Guests</p>
+                  <p className="font-semibold">
+                       {totalGuests} {totalGuests === 1 ? "guest" : "guests"}
+                  </p>
+                </div>
+
+                <button
+                    onClick={() => setShowChangeGuests(true)}
+                    className="text-sm font-semibold underline hover:bg-neutral-50 px-3 py-2 rounded"
+                >
+                    Change
+                </button>
+              </div>
+
+                {/* Cancellation Policy */}
+                <div className="border-b border-neutral-200 py-4">
+                  <p className="font-semibold mb-2">Free cancellation</p>
+                  <p className="text-sm text-neutral-700">
+                    Cancel before {format(new Date(checkInDate.getTime() - 24 * 60 * 60 * 1000), 'h:mm a')} on {format(new Date(checkInDate.getTime() - 24 * 60 * 60 * 1000), 'd MMMM')} for a full refund.{' '}
+                    <button className="font-semibold underline">Full policy</button>
+                  </p>
+                </div>
+                {/* Price Details */}
+                <div className="py-6">
+                  <h3 className="font-semibold mb-4">Price details</h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-neutral-600">{calculateNights()} {calculateNights() === 1 ? 'night' : 'nights'} x ₹{listing.pricePerNight?.toLocaleString()}</span>
+                      <span>₹{(listing.pricePerNight * calculateNights()).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-green-600">
+                      <span>Special offer</span>
+                      <span>-₹{Math.round(listing.pricePerNight * calculateNights() * 0.15).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-neutral-600">Taxes</span>
+                      <span>₹{Math.round((listing.pricePerNight * calculateNights() * 0.18)).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Total */}
+                <div className="border-t border-neutral-200 pt-4 flex items-center justify-between mb-6">
+                  <p className="font-semibold text-lg">Total INR</p>
+                  <p className="font-semibold text-lg">₹{Math.round(listing.pricePerNight * calculateNights() - (listing.pricePerNight * calculateNights() * 0.15) + (listing.pricePerNight * calculateNights() * 0.18)).toLocaleString()}</p>
+                </div>
+
+                {/* Price Breakdown Link */}
+                <button className="text-sm font-semibold underline text-neutral-700 mb-6">
+                  Price breakdown
+                </button>
+
+                {/* Info Text */}
+                <p className="text-xs text-neutral-600 mb-4">
+                  You'll be directed to Razorpay to complete payment.
+                </p>
+
+                {/* Agreement */}
+                <p className="text-xs text-neutral-600 mb-6">
+                  By selecting the button, I agree to the{' '}
+                  <button className="font-semibold underline">booking terms</button>
+                </p>
+              </div>
+
+
+              {/* Footer Button */}
+              <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 px-5 py-4 lg:hidden">
+                <Link
+                  href={`/listings/${listing._id}/reserve?checkIn=${checkInDate.toISOString()}&checkOut=${checkOutDate.toISOString()}&adults=${adults}&children=${children}&infants=${infants}&pets=${pets}`}
+                  className="block w-full bg-black text-white py-3 rounded-lg font-semibold text-center hover:bg-neutral-800 transition"
+                >
+                  Continue to Razorpay
+                </Link>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Change Guests Panel */}
+      <AnimatePresence>
+        {showChangeGuests && (
+          <>
+            <div 
+              className="fixed inset-0 bg-black/20 z-40 lg:hidden" 
+              onClick={() => setShowChangeGuests(false)} 
+            />
+            
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+              className="fixed inset-x-0 bottom-0 bg-white z-50 rounded-t-2xl max-h-[90vh] overflow-y-auto lg:hidden"
+            >
+              {/* Header */}
+              <div className="sticky top-0 bg-white border-b border-neutral-200 px-5 py-4 flex items-center justify-between z-10">
+                <h2 className="text-xl font-semibold">Change guests</h2>
+                <button 
+                  onClick={() => setShowChangeGuests(false)} 
+                  className="p-2 hover:bg-neutral-100 rounded-full transition"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-5 pb-32">
+                <p className="text-sm text-neutral-600 mb-6">
+                  This place has a maximum of {listing.maxGuests} guests, not including infants. If you're bringing more than {listing.maxGuests} pets, please let your host know.
+                </p>
+
+                {/* Adults */}
+                <div className="border-b border-neutral-200 py-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold">Adults</h3>
+                    <p className="text-sm text-neutral-600">Age 13+</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button 
+                      onClick={() => setAdults(Math.max(1, adults - 1))}
+                      className="w-8 h-8 border border-neutral-300 rounded-full flex items-center justify-center hover:border-neutral-900"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <span className="w-8 text-center">{adults}</span>
+                    <button 
+                      onClick={() => setAdults(adults + 1)}
+                      className="w-8 h-8 border border-neutral-300 rounded-full flex items-center justify-center hover:border-neutral-900"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Children */}
+                <div className="border-b border-neutral-200 py-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold">Children</h3>
+                    <p className="text-sm text-neutral-600">Ages 2 – 12</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button 
+                      onClick={() => setChildren(Math.max(0, children - 1))}
+                      className="w-8 h-8 border border-neutral-300 rounded-full flex items-center justify-center hover:border-neutral-900"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <span className="w-8 text-center">{children}</span>
+                    <button 
+                      onClick={() => setChildren(children + 1)}
+                      className="w-8 h-8 border border-neutral-300 rounded-full flex items-center justify-center hover:border-neutral-900"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Infants */}
+                <div className="border-b border-neutral-200 py-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold">Infants</h3>
+                    <p className="text-sm text-neutral-600">Under 2</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button 
+                      onClick={() => setInfants(Math.max(0, infants - 1))}
+                      className="w-8 h-8 border border-neutral-300 rounded-full flex items-center justify-center hover:border-neutral-900"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <span className="w-8 text-center">{infants}</span>
+                    <button 
+                      onClick={() => setInfants(infants + 1)}
+                      className="w-8 h-8 border border-neutral-300 rounded-full flex items-center justify-center hover:border-neutral-900"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Pets */}
+                <div className="py-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold">Pets</h3>
+                    <button className="text-sm text-neutral-600 underline hover:text-neutral-900">
+                      Bringing a service animal?
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button 
+                      onClick={() => setPets(Math.max(0, pets - 1))}
+                      className="w-8 h-8 border border-neutral-300 rounded-full flex items-center justify-center hover:border-neutral-900"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <span className="w-8 text-center">{pets}</span>
+                    <button 
+                      onClick={() => setPets(pets + 1)}
+                      className="w-8 h-8 border border-neutral-300 rounded-full flex items-center justify-center hover:border-neutral-900"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 px-5 py-4 flex items-center justify-between lg:hidden">
+                <button 
+                  onClick={() => setShowChangeGuests(false)}
+                  className="text-neutral-700 font-semibold hover:bg-neutral-50 px-6 py-2 rounded"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => setShowChangeGuests(false)}
+                  className="bg-black text-white font-semibold px-8 py-2 rounded hover:bg-neutral-800 transition"
+                >
+                  Save
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Change Dates Panel */}
+      <AnimatePresence>
+        {showChangeDates && (
+          <>
+            <div 
+              className="fixed inset-0 bg-black/20 z-40 lg:hidden" 
+              onClick={() => setShowChangeDates(false)} 
+            />
+            
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+              className="fixed inset-x-0 bottom-0 bg-white z-50 rounded-t-2xl max-h-[95vh] overflow-y-auto lg:hidden"
+            >
+              {/* Header */}
+              <div className="sticky top-0 bg-white border-b border-neutral-200 px-5 py-4 flex items-center justify-between z-10">
+                <button 
+                  onClick={() => setShowChangeDates(false)} 
+                  className="p-2 hover:bg-neutral-100 rounded-full transition"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+                <h2 className="text-lg font-semibold absolute left-1/2 -translate-x-1/2">Select dates</h2>
+                <button 
+                  onClick={() => {
+                    setCheckInDate(undefined);
+                    setCheckOutDate(undefined);
+                  }}
+                  className="text-sm font-semibold underline"
+                >
+                  Clear
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-5 pb-32">
+                {/* Calendar */}
+                <Calendar
+                  mode="range"
+                  selected={{
+                    from: checkInDate,
+                    to: checkOutDate,
+                  }}
+                  onSelect={(range) => {
+                    if (range?.from) {
+                      setCheckInDate(range.from);
+                      setCheckOutDate(range.to);
+                    }
+                  }}
+                  numberOfMonths={3}
+                  className="rounded-md"
+                  disabled={(date) => date < new Date()}
+                />
+              </div>
+
+              {/* Footer */}
+              <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 px-5 py-4 flex items-center justify-between lg:hidden">
+                <button 
+                  onClick={() => setShowChangeDates(false)}
+                  className="text-neutral-700 font-semibold hover:bg-neutral-50 px-6 py-2 rounded"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => setShowChangeDates(false)}
+                  disabled={!checkInDate || !checkOutDate}
+                  className="bg-black text-white font-semibold px-8 py-2 rounded hover:bg-neutral-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Save
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+      </motion.div>
   );
 }

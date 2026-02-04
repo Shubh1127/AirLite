@@ -13,6 +13,7 @@ import TitleDescription from "@/components/host/steps/TitleDescription";
 import Pricing from "@/components/host/steps/Pricing";
 import HouseRules from "@/components/host/steps/HouseRules";
 import { useAuthStore } from "@/store/authStore";
+import { motion } from "framer-motion";
 
 export default function CreateListingPage() {
   const router = useRouter();
@@ -294,7 +295,13 @@ export default function CreateListingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <motion.div
+      initial={{ x: '100%' }}
+      animate={{ x: 0 }}
+      exit={{ x: '100%' }}
+      transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+      className="min-h-screen bg-white"
+    >
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-50">
         <div className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
@@ -336,6 +343,6 @@ export default function CreateListingPage() {
           </button>
         </div>
       </footer>
-    </div>
+    </motion.div>
   );
 }

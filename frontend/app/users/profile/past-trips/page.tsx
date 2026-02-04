@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { format } from 'date-fns';
 import Link from 'next/link';
-import { X, Star } from 'lucide-react';
+import { X, Star, ChevronLeft } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -184,18 +185,45 @@ export default function PastTripsPage() {
   }
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-8">Past trips</h1>
+    <motion.div
+      className="min-h-screen bg-white pb-24"
+      initial={{ x: '100%' }}
+      animate={{ x: 0 }}
+      exit={{ x: '100%' }}
+      transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+    >
+      <div className="px-5 pt-6">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="w-10 h-10 rounded-full border border-neutral-200 flex items-center justify-center"
+        >
+          <ChevronLeft className="w-5 h-5 text-neutral-700" />
+        </button>
+        <h1 className="text-2xl font-bold mt-4">Past trips</h1>
+      </div>
       
       {pastTrips.length === 0 ? (
-        <div className="bg-white border border-neutral-200 rounded-2xl p-12 text-center">
-          <p className="text-neutral-600 text-lg">No past trips yet</p>
-          <Link href="/" className="mt-4 inline-block text-rose-500 hover:underline">
-            Browse listings
+        <div className="px-5 mt-8 text-center">
+          <div className="mx-auto w-32 h-32 rounded-2xl overflow-hidden">
+            <img
+              src="https://a0.muscache.com/im/pictures/8f9d8b02-05c9-4b8c-9f2c-47f4a2164eb7.jpg"
+              alt="Past trips"
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <p className="mt-6 text-sm text-neutral-600">
+            You’ll find your past reservations here after you’ve taken your first trip on Airbnb.
+          </p>
+          <Link
+            href="/"
+            className="mt-6 inline-block bg-rose-500 text-white text-sm font-semibold px-6 py-3 rounded-full"
+          >
+            Book a trip
           </Link>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="px-5 mt-6 space-y-6">
           {pastTrips.map((trip) => {
             const listing = trip.listing || {};
             const checkIn = trip.checkInDate ? new Date(trip.checkInDate) : null;
@@ -416,6 +444,6 @@ export default function PastTripsPage() {
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

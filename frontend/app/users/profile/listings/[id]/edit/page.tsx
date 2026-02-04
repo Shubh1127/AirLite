@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Save, Upload, X } from 'lucide-react';
+import { ArrowLeft, Save, Upload, X, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { listingsAPI } from '@/lib/listings';
+import { motion } from 'framer-motion';
 
 export default function EditListingPage() {
   const params = useParams();
@@ -267,13 +268,27 @@ export default function EditListingPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
+    <motion.div
+      initial={{ x: '100%' }}
+      animate={{ x: 0 }}
+      exit={{ x: '100%' }}
+      transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+      className="space-y-6"
+    >
+      {/* Mobile Back Button */}
+      <div className="lg:hidden sticky top-0 bg-white border-b border-neutral-200 px-4 py-3 flex items-center gap-3 z-10 -mx-4 -mt-6 mb-6">
+        <Link href="/users/profile/listings" className="p-2 hover:bg-neutral-100 rounded-full transition">
+          <ChevronLeft className="w-6 h-6" />
+        </Link>
+        <h1 className="text-lg font-semibold">Edit listing</h1>
+      </div>
+
+      <div className="hidden lg:flex items-center gap-4">
         <Link
           href="/users/profile/listings"
-          className="p-2 hover:bg-gray-100 rounded-lg transition"
+          className="p-2 hover:bg-gray-100 rounded-lg transition border border-gray-200"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ChevronLeft className="w-5 h-5" />
         </Link>
         <div>
           <h1 className="text-3xl font-semibold text-gray-900">Edit listing</h1>
@@ -669,6 +684,6 @@ export default function EditListingPage() {
           </button>
         </div>
       </form>
-    </div>
+    </motion.div>
   );
 }

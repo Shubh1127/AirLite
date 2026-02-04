@@ -4,8 +4,9 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Briefcase, MapPin, GraduationCap, Clock, Music, Wand2, Heart, PawPrint, Sparkles, Globe, Upload } from 'lucide-react';
+import { Briefcase, MapPin, GraduationCap, Clock, Music, Wand2, Heart, PawPrint, Sparkles, Globe, Upload, ChevronLeft } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
+import { motion } from 'framer-motion';
 
 const prompts = [
   { id: 'decadeOfBirth', label: 'Decade I was born', icon: Sparkles },
@@ -193,8 +194,33 @@ export default function ProfileEditPage() {
   }
 
   return (
-    <main className="min-h-screen bg-white">
+    <motion.main 
+      initial={{ x: '100%' }}
+      animate={{ x: 0 }}
+      exit={{ x: '100%' }}
+      transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+      className="min-h-screen bg-white"
+    >
+      {/* Mobile Back Button */}
+      <div className="lg:hidden sticky top-0 bg-white border-b border-neutral-200 px-4 py-3 flex items-center gap-3 z-10">
+        <Link href="/users/profile" className="p-2 hover:bg-neutral-100 rounded-full transition">
+          <ChevronLeft className="w-6 h-6" />
+        </Link>
+        <h1 className="text-lg font-semibold">Account settings</h1>
+      </div>
+
       <div className="max-w-6xl mx-auto px-4 py-12">
+        {/* Desktop Back Button */}
+        <div className="hidden lg:flex items-center gap-3 mb-8">
+          <Link href="/users/profile" className="p-2 hover:bg-neutral-100 rounded-full transition border border-neutral-200">
+            <ChevronLeft className="w-5 h-5" />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold">Account settings</h1>
+            <p className="text-sm text-neutral-600">Edit your profile and preferences</p>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
           {/* Left Column */}
           <div className="md:col-span-1 flex flex-col items-center">
@@ -377,6 +403,6 @@ export default function ProfileEditPage() {
           {error}
         </div>
       )}
-    </main>
+    </motion.main>
   );
 }

@@ -46,7 +46,7 @@ export function Navbar() {
   };
 
   return (
-    <nav className="bg-black text-white shadow-md">
+    <nav className="hidden lg:block bg-black text-white shadow-md">
        <header className="border-b border-neutral-200">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
