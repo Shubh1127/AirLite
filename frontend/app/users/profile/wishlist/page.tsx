@@ -11,18 +11,20 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 export default function WishlistPage() {
   const router = useRouter();
-  const { isAuthenticated, token } = useAuthStore();
+  const { isAuthenticated, token, hasHydrated } = useAuthStore();
   const [wishlist, setWishlist] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!hasHydrated) return;
+
     if (!isAuthenticated) {
       router.push("/auth/login");
       return;
     }
 
     fetchWishlist();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, hasHydrated, router, token]);
 
   const fetchWishlist = async () => {
     try {
@@ -69,12 +71,16 @@ export default function WishlistPage() {
     }
   };
 
-  if (loading) {
+  if (loading || !hasHydrated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-rose-500" />
       </div>
     );
+  }
+
+  if (!isAuthenticated) {
+    return null;
   }
 
   return (

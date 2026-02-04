@@ -8,7 +8,7 @@ import { Calendar, X, Edit, AlertCircle, CheckCircle, Clock, XCircle } from 'luc
 import { useRouter } from 'next/navigation';
 
 export default function TripsPage() {
-  const { token, isAuthenticated } = useAuthStore();
+  const { token, isAuthenticated, hasHydrated } = useAuthStore();
   const router = useRouter();
   const [trips, setTrips] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,13 +21,16 @@ export default function TripsPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (!hasHydrated) return;
+
     if (!isAuthenticated || !token) {
+      router.push("/auth/login");
       setLoading(false);
       return;
     }
 
     fetchTrips();
-  }, [isAuthenticated, token]);
+  }, [isAuthenticated, token, hasHydrated, router]);
 
   const fetchTrips = async () => {
     try {
@@ -122,6 +125,18 @@ export default function TripsPage() {
         return null;
     }
   };
+
+  if (!hasHydrated || loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
