@@ -18,7 +18,7 @@ export function ListingCardSkeleton() {
         <div className="flex flex-col justify-center space-y-3">
           {/* Category & Country Skeleton */}
           <div className="space-y-2">
-            <div className="h-4 bg-neutral-200 rounded-md w-3/4 animate-pulse" />
+            <div className="h-3 bg-neutral-200 rounded-md w-3/4 animate-pulse" />
           </div>
 
           {/* Price & Rating Skeleton */}
