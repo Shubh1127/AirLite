@@ -276,7 +276,6 @@ exports.googleOAuth = async (req, res) => {
   }
 };
 
-
 /* =========================
    GET CURRENT USER
 ========================= */
@@ -463,9 +462,6 @@ exports.toggleWishlist = async (req, res) => {
 /* =========================
    BECOME HOST
 ========================= */
-/* =========================
-   BECOME HOST
-========================= */
 exports.becomeHost = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -569,26 +565,31 @@ exports.updateHostProfile = async (req, res) => {
     const parsedCertifications = typeof certifications === 'string' ? JSON.parse(certifications) : certifications;
     const parsedLocalRecommendations = typeof localRecommendations === 'string' ? JSON.parse(localRecommendations) : localRecommendations;
 
-    // Update host profile
-    user.hostProfile = {
-      ...user.hostProfile,
-      ...(experienceYears !== undefined && { experienceYears }),
-      ...(parsedEducation && { education: parsedEducation }),
-      ...(parsedProfessionalWork && { professionalWork: parsedProfessionalWork }),
-      ...(parsedLanguages && { languages: parsedLanguages }),
-      ...(hostBio !== undefined && { hostBio }),
-      ...(whyHost !== undefined && { whyHost }),
-      ...(hostStory !== undefined && { hostStory }),
-      ...(hostingStyle && { hostingStyle }),
-      ...(parsedLocalRecommendations && { localRecommendations: parsedLocalRecommendations }),
-      ...(parsedCertifications && { certifications: parsedCertifications }),
-      ...(responseTime && { 
-        responseStats: {
-          ...user.hostProfile?.responseStats,
-          responseTime
-        }
-      })
-    };
+    // Update host profile properties individually to preserve existing fields
+    if (!user.hostProfile) {
+      user.hostProfile = {};
+    }
+
+    if (experienceYears !== undefined) user.hostProfile.experienceYears = experienceYears;
+    if (parsedEducation) user.hostProfile.education = parsedEducation;
+    if (parsedProfessionalWork) user.hostProfile.professionalWork = parsedProfessionalWork;
+    if (parsedLanguages) user.hostProfile.languages = parsedLanguages;
+    if (hostBio !== undefined) user.hostProfile.hostBio = hostBio;
+    if (whyHost !== undefined) user.hostProfile.whyHost = whyHost;
+    if (hostStory !== undefined) user.hostProfile.hostStory = hostStory;
+    if (hostingStyle) user.hostProfile.hostingStyle = hostingStyle;
+    if (parsedLocalRecommendations) user.hostProfile.localRecommendations = parsedLocalRecommendations;
+    if (parsedCertifications) user.hostProfile.certifications = parsedCertifications;
+    
+    if (responseTime) {
+      if (!user.hostProfile.responseStats) {
+        user.hostProfile.responseStats = {};
+      }
+      user.hostProfile.responseStats.responseTime = responseTime;
+    }
+
+    // Mark the nested object as modified for Mongoose
+    user.markModified('hostProfile');
 
     await user.save();
 
@@ -664,6 +665,120 @@ exports.updateHostVerifications = async (req, res) => {
   } catch (err) {
     console.error("Update verifications error:", err);
     res.status(500).json({ message: "Failed to update verifications" });
+  }
+};
+
+/* =========================
+   SEND HOST EMAIL VERIFICATION OTP
+========================= */
+exports.sendHostEmailVerification = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.role === "guest") {
+      return res.status(400).json({ 
+        message: "You need to be a host to verify host email" 
+      });
+    }
+
+    // Check if already verified
+    if (user.hostProfile?.verifications?.email) {
+      return res.status(400).json({ message: "Host email already verified" });
+    }
+
+    // Generate 6-digit verification code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    user.emailVerificationToken = crypto
+      .createHash("sha256")
+      .update(verificationCode)
+      .digest("hex");
+    user.emailVerificationExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
+
+    await user.save();
+
+    // Send verification email with code
+    await sendVerificationEmail(
+      {
+        email: user.email,
+        name: user.firstName || user.email.split("@")[0],
+        username: user.firstName || user.email.split("@")[0],
+      },
+      verificationCode
+    );
+
+    res.json({
+      message: "Verification OTP sent to your email",
+      expiresIn: "15 minutes"
+    });
+  } catch (err) {
+    console.error("Send host verification error:", err);
+    res.status(500).json({ message: "Failed to send verification OTP" });
+  }
+};
+
+/* =========================
+   VERIFY HOST EMAIL WITH OTP
+========================= */
+exports.verifyHostEmail = async (req, res) => {
+  try {
+    const { code } = req.body;
+    const userId = req.user?.id;
+
+    if (!code) {
+      return res.status(400).json({ message: "Verification code is required" });
+    }
+
+    // Hash code to compare with stored hash
+    const hashedCode = crypto.createHash("sha256").update(code.toString()).digest("hex");
+
+    const user = await User.findOne({
+      _id: userId,
+      emailVerificationToken: hashedCode,
+      emailVerificationExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired verification code" });
+    }
+
+    if (user.role === "guest") {
+      return res.status(400).json({ 
+        message: "You need to be a host to verify host email" 
+      });
+    }
+
+    // Mark email as verified in both places
+    user.isEmailVerified = true;
+    
+    // Initialize hostProfile.verifications if it doesn't exist
+    if (!user.hostProfile.verifications) {
+      user.hostProfile.verifications = {
+        email: false,
+        phone: false,
+        identity: false,
+        workEmail: false,
+        governmentId: false,
+      };
+    }
+    
+    user.hostProfile.verifications.email = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+
+    user.markModified('hostProfile');
+    await user.save();
+
+    res.json({
+      message: "Host email verified successfully",
+      verifications: user.hostProfile.verifications
+    });
+  } catch (err) {
+    console.error("Verify host email error:", err);
+    res.status(500).json({ message: "Failed to verify host email" });
   }
 };
 

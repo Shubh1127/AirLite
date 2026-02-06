@@ -65,6 +65,12 @@ router.put("/host-profile", isLoggedIn, userController.updateHostProfile);
 // Update host verifications (ID, work email, etc.)
 router.put("/host-verifications", isLoggedIn, userController.updateHostVerifications);
 
+// Send host email verification OTP
+router.post("/host/send-email-verification", isLoggedIn, userController.sendHostEmailVerification);
+
+// Verify host email with OTP
+router.post("/host/verify-email", isLoggedIn, userController.verifyHostEmail);
+
 /* =========================
    USER ACTIONS
 ========================= */
