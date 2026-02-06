@@ -47,6 +47,8 @@ app.use(
 
 // Webhook route MUST be registered BEFORE express.json() to preserve raw body for signature verification
 app.use("/api/webhooks", express.raw({ type: 'application/json' }), webhookRoutes);
+// Also register at root path for Razorpay compatibility
+app.use("/webhooks", express.raw({ type: 'application/json' }), webhookRoutes);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
