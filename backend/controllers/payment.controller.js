@@ -151,8 +151,10 @@ exports.verifyPayment = async (req, res) => {
 
       const reservationObj = {
         _id: reservation._id,
-        checkIn: reservation.checkInDate,
-        checkOut: reservation.checkOutDate,
+        checkIn: reservation.checkInDate,  // Template uses checkIn, not checkInDate
+        checkOut: reservation.checkOutDate, // Template uses checkOut, not checkOutDate
+        checkInDate: reservation.checkInDate,  // Keep both for compatibility
+        checkOutDate: reservation.checkOutDate,
         numberOfGuests: (reservation.adults || 0) + (reservation.children || 0),
         numberOfNights: Math.ceil(
           (new Date(reservation.checkOutDate) -
@@ -175,19 +177,24 @@ exports.verifyPayment = async (req, res) => {
         method: "Razorpay",
       };
 
-      // Send both emails
-      sendReservationEmail(userObj, reservationObj, listingObj).catch((err) =>
-        console.error("Failed to send reservation email:", err),
-      );
+      // Send both emails with a small delay between them
+      console.log('Attempting to send reservation confirmation email...');
+      sendReservationEmail(userObj, reservationObj, listingObj)
+        .then(() => console.log('✅ Reservation email sent successfully'))
+        .catch((err) => console.error("❌ Failed to send reservation email:", err.message || err));
 
-      sendPaymentSuccessEmail(
-        userObj,
-        paymentObj,
-        reservationObj,
-        listingObj,
-      ).catch((err) =>
-        console.error("Failed to send payment success email:", err),
-      );
+      // Small delay before sending second email to avoid rate limiting
+      setTimeout(() => {
+        console.log('Attempting to send payment success email...');
+        sendPaymentSuccessEmail(
+          userObj,
+          paymentObj,
+          reservationObj,
+          listingObj,
+        )
+          .then(() => console.log('✅ Payment success email sent successfully'))
+          .catch((err) => console.error("❌ Failed to send payment success email:", err.message || err));
+      }, 1000); // 1 second delay
     }
 
     res.json({
