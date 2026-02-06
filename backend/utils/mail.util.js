@@ -13,33 +13,52 @@ const {
 } = require('./emailTemplates');
 
 /**
- * Send email using nodemailer
+ * Send email with retry logic
  * @param {Object} options - Email options
  * @param {string} options.to - Recipient email address
  * @param {string} options.subject - Email subject
  * @param {string} options.html - HTML content
  * @param {string} options.text - Plain text content (optional)
+ * @param {number} retries - Number of retry attempts (default: 3)
  * @returns {Promise} - Promise resolving to email info
  */
-const sendEmail = async (options) => {
-  try {
-    const transporter = createTransporter();
+const sendEmail = async (options, retries = 3) => {
+  let lastError;
 
-    const mailOptions = {
-      from: `"AirLite" <${process.env.MAIL_USER}>`, // sender address
-      to: options.to,
-      subject: options.subject,
-      text: options.text,
-      html: options.html,
-    };
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const transporter = createTransporter();
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log('Email sent: ' + info.messageId);
-    return info;
-  } catch (error) {
-    console.error('Error sending email:', error);
-    throw error;
+      const mailOptions = {
+        from: `"AirLite" <${process.env.MAIL_USER}>`, // sender address
+        to: options.to,
+        subject: options.subject,
+        text: options.text,
+        html: options.html,
+      };
+
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`Email sent successfully (attempt ${attempt}): ${info.messageId}`);
+      return info;
+    } catch (error) {
+      lastError = error;
+      console.error(`Email send attempt ${attempt}/${retries} failed:`, error.message);
+
+      // Only retry on specific timeout/connection errors
+      if (attempt < retries && (error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED' || error.code === 'NetworkError')) {
+        const delayMs = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s, 4s
+        console.log(`Retrying in ${delayMs}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      } else {
+        // Don't retry for other errors
+        break;
+      }
+    }
   }
+
+  // Log final error and throw
+  console.error('Email failed after all retries:', lastError?.message);
+  throw lastError || new Error('Failed to send email after multiple attempts');
 };
 
 /**
