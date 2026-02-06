@@ -244,6 +244,9 @@ const userSchema = new mongoose.Schema(
 
     resetPasswordToken: String,
     resetPasswordExpires: Date,
+    
+    emailVerificationToken: String,
+    emailVerificationExpires: Date,
   },
   { timestamps: true },
 );
@@ -267,6 +270,11 @@ userSchema.virtual("hostExperience").get(function () {
 
 // Middleware to calculate years of experience before save
 userSchema.pre("save", function (next) {
+  // Auto-verify email for Google users
+  if (this.provider === "google" && !this.isEmailVerified) {
+    this.isEmailVerified = true;
+  }
+  
   if (this.hostProfile?.hostSince) {
     const currentDate = new Date();
     const hostSinceDate = new Date(this.hostProfile.hostSince);

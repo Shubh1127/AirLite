@@ -3,6 +3,8 @@ const Review = require("../models/review.model");
 const Reservation = require("../models/reservation.model");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
+const { sendSignupEmail, sendLoginEmail, sendVerificationEmail } = require("../utils/mail.util");
 
 /* =========================
    TOKEN HELPER
@@ -46,6 +48,32 @@ exports.register = async (req, res) => {
 
     const token = generateToken(user._id);
 
+    // Generate 6-digit verification code and send email
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    user.emailVerificationToken = crypto
+      .createHash("sha256")
+      .update(verificationCode)
+      .digest("hex");
+    user.emailVerificationExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
+    await user.save();
+
+    // Send welcome email (async, don't wait)
+    sendSignupEmail({
+      email: user.email,
+      name: user.firstName || user.email.split('@')[0],
+      username: user.firstName || user.email.split('@')[0],
+    }).catch(err => console.error('Failed to send signup email:', err));
+
+    // Send verification email with code (async, don't wait)
+    sendVerificationEmail(
+      {
+        email: user.email,
+        name: user.firstName || user.email.split('@')[0],
+        username: user.firstName || user.email.split('@')[0],
+      },
+      verificationCode
+    ).catch(err => console.error('Failed to send verification email:', err));
+
     res.status(201).json({
       message: "User registered successfully",
       token,
@@ -54,6 +82,8 @@ exports.register = async (req, res) => {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        isEmailVerified: user.isEmailVerified,
+        provider: user.provider,
       },
     });
   } catch (err) {
@@ -110,6 +140,21 @@ exports.login = async (req, res) => {
 
     const token = generateToken(user._id);
 
+    // Send login notification email (async, don't wait)
+    sendLoginEmail(
+      {
+        email: user.email,
+        name: user.firstName || user.email.split('@')[0],
+        username: user.firstName || user.email.split('@')[0],
+      },
+      {
+        time: new Date().toLocaleString(),
+        device: req.headers['user-agent'] || 'Unknown',
+        location: req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'Unknown',
+        ip: req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'Unknown',
+      }
+    ).catch(err => console.error('Failed to send login email:', err));
+
     res.status(200).json({
       message: "Login successful",
       token,
@@ -121,6 +166,8 @@ exports.login = async (req, res) => {
         role: user.role,
         profile: user.profile,
         avatar: user.avatar,
+        isEmailVerified: user.isEmailVerified,
+        provider: user.provider,
       },
     });
   } catch (err) {
@@ -150,11 +197,21 @@ exports.googleOAuth = async (req, res) => {
         user.googleId = googleId;
       }
 
-      // ✅ Correct provider merge logic
+      // ✅ If user was created locally but now logging in with Google, verify email and update provider
       if (user.provider === "local") {
-        user.provider = "both";
-      } else if (user.provider !== "both") {
+        user.isEmailVerified = true; // Google has verified the email
+        user.emailVerificationToken = undefined; // Clear any pending verification
+        user.emailVerificationExpires = undefined;
+        user.provider = "both"; // User can now use both methods
+      } else if (user.provider !== "both" && user.provider !== "google") {
         user.provider = "google";
+      }
+
+      // ✅ Ensure Google users are always verified
+      if (!user.isEmailVerified) {
+        user.isEmailVerified = true;
+        user.emailVerificationToken = undefined;
+        user.emailVerificationExpires = undefined;
       }
 
       // ✅ Update avatar only if missing
@@ -178,6 +235,8 @@ exports.googleOAuth = async (req, res) => {
           role: user.role,
           profile: user.profile,
           avatar: user.avatar,
+          isEmailVerified: user.isEmailVerified,
+          provider: user.provider,
         },
         needsAdditionalInfo: !user.phone || !user.dateOfBirth,
       });
@@ -658,5 +717,148 @@ exports.promoteToSuperhost = async (req, res) => {
   } catch (err) {
     console.error("Promote superhost error:", err);
     res.status(500).json({ message: "Failed to promote superhost" });
+  }
+};
+
+/* =========================
+   SEND EMAIL VERIFICATION
+========================= */
+exports.sendEmailVerification = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check if user signed up with Google
+    if (user.provider === "google") {
+      return res.status(400).json({ message: "Google users are already verified" });
+    }
+
+    // Check if already verified
+    if (user.isEmailVerified) {
+      return res.status(400).json({ message: "Email already verified" });
+    }
+
+    // Generate 6-digit verification code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    user.emailVerificationToken = crypto
+      .createHash("sha256")
+      .update(verificationCode)
+      .digest("hex");
+    user.emailVerificationExpires = Date.now() + 15 * 60 * 1000; // 15 minutes
+
+    await user.save();
+
+    // Send verification email with code
+    await sendVerificationEmail(
+      {
+        email: user.email,
+        name: user.firstName || user.email.split("@")[0],
+        username: user.firstName || user.email.split("@")[0],
+      },
+      verificationCode
+    );
+
+    res.json({
+      message: "Verification email sent successfully",
+    });
+  } catch (err) {
+    console.error("Send verification error:", err);
+    res.status(500).json({ message: "Failed to send verification email" });
+  }
+};
+
+/* =========================
+   VERIFY EMAIL WITH CODE
+========================= */
+exports.verifyEmail = async (req, res) => {
+  try {
+    const { code } = req.body;
+    const userId = req.user?.id;
+
+    if (!code) {
+      return res.status(400).json({ message: "Verification code is required" });
+    }
+
+    // Hash code to compare with stored hash
+    const hashedCode = crypto.createHash("sha256").update(code.toString()).digest("hex");
+
+    const user = await User.findOne({
+      _id: userId,
+      emailVerificationToken: hashedCode,
+      emailVerificationExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired verification code" });
+    }
+
+    // Mark email as verified
+    user.isEmailVerified = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+
+    await user.save();
+
+    res.json({
+      message: "Email verified successfully",
+      isEmailVerified: true,
+    });
+  } catch (err) {
+    console.error("Verify email error:", err);
+    res.status(500).json({ message: "Failed to verify email" });
+  }
+};
+
+/* =========================
+   CHANGE PASSWORD
+========================= */
+exports.changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Current password and new password are required" });
+    }
+
+    const user = await User.findById(req.user.id).select("+password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check if user signed up with Google
+    if (user.provider === "google") {
+      return res.status(400).json({ message: "Google users cannot change password" });
+    }
+
+    // Check if email is verified
+    if (!user.isEmailVerified) {
+      return res.status(403).json({ message: "Please verify your email before changing password" });
+    }
+
+    // Verify current password
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Current password is incorrect" });
+    }
+
+    // Validate new password
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "New password must be at least 6 characters" });
+    }
+
+    // Update password
+    user.password = newPassword;
+    await user.save();
+
+    res.json({
+      message: "Password changed successfully",
+    });
+  } catch (err) {
+    console.error("Change password error:", err);
+    res.status(500).json({ message: "Failed to change password" });
   }
 };

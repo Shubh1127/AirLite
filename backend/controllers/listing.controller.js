@@ -1,5 +1,6 @@
 const Listing = require("../models/listing.model");
 const mbxGeocoding = require("@mapbox/mapbox-sdk/services/geocoding");
+const { sendListingCreatedEmail } = require("../utils/mail.util");
 
 const geocodingClient = mbxGeocoding({
   accessToken: process.env.MAP_TOKEN,
@@ -431,6 +432,24 @@ exports.createListing = async (req, res) => {
     if (user && user.role === "guest") {
       user.role = "both";
       await user.save();
+    }
+
+    // Send listing created email (async, don't wait)
+    if (user) {
+      sendListingCreatedEmail(
+        {
+          email: user.email,
+          name: user.firstName || user.email.split('@')[0],
+          username: user.firstName || user.email.split('@')[0],
+        },
+        {
+          _id: listing._id,
+          title: listing.title,
+          location: listing.location,
+          price: listing.pricePerNight,
+          category: listing.category,
+        }
+      ).catch(err => console.error('Failed to send listing created email:', err));
     }
 
     res.status(201).json({

@@ -3,6 +3,7 @@ const router = express.Router();
 
 const listingController = require("../controllers/listing.controller");
 const { isLoggedIn } = require("../middlewares/auth.middlware");
+const { requireEmailVerification } = require("../middlewares/emailVerification.middleware");
 const upload = require("../middlewares/multer.middleware");
 
 /* =========================
@@ -17,6 +18,7 @@ router.get("/:id([0-9a-fA-F]{24})", listingController.getListingById);
 router.post(
   "/",
   isLoggedIn,
+  requireEmailVerification,
   upload.array("images", 5),
   listingController.createListing
 );

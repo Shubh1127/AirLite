@@ -14,6 +14,7 @@ const reviewRoutes = require("./routes/reviews.route");
 const userRoutes = require("./routes/user.route");
 const paymentRoutes = require("./routes/payment.route");
 const wishlistRoutes = require("./routes/wishlist.route");
+const webhookRoutes = require("./routes/webhook.route");
 
 const ExpressError = require("./utils/ExpressError.util");
 
@@ -55,6 +56,7 @@ app.use("/api/listings", listingRoutes);
 app.use("/api/listings/:id/reviews", reviewRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/wishlist", wishlistRoutes);
+app.use("/api/webhooks", webhookRoutes);
 
 /* =========================
    HEALTH CHECK

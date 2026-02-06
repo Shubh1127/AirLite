@@ -43,6 +43,12 @@ router.post("/skip-profile-setup", isLoggedIn, userController.skipProfileSetup);
 // Change password
 router.put("/change-password", isLoggedIn, userController.changePassword);
 
+// Send email verification
+router.post("/send-verification-email", isLoggedIn, userController.sendEmailVerification);
+
+// Verify email with code
+router.post("/verify-email", isLoggedIn, userController.verifyEmail);
+
 /* =========================
    HOST PROFILE ROUTES
 ========================= */
