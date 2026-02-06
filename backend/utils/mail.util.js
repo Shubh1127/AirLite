@@ -29,8 +29,13 @@ const sendEmail = async (options, retries = 3) => {
     try {
       const transporter = createTransporter();
 
+      // Use verified SendGrid sender or Gmail sender
+      const fromEmail = process.env.SENDGRID_API_KEY 
+        ? (process.env.SENDGRID_FROM_EMAIL || 'noreply@airlite.com')
+        : process.env.MAIL_USER;
+
       const mailOptions = {
-        from: `"AirLite" <${process.env.MAIL_USER}>`, // sender address
+        from: `"AirLite" <${fromEmail}>`,
         to: options.to,
         subject: options.subject,
         text: options.text,
@@ -38,6 +43,8 @@ const sendEmail = async (options, retries = 3) => {
       };
 
       const info = await transporter.sendMail(mailOptions);
+      console.log(`Email sent successfully (attempt ${attempt}): ${info.messageId}`);
+      return info;
       console.log(`Email sent successfully (attempt ${attempt}): ${info.messageId}`);
       return info;
     } catch (error) {

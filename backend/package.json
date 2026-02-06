@@ -15,6 +15,7 @@
   "description": "",
   "dependencies": {
     "@mapbox/mapbox-sdk": "^0.16.0",
+    "@sendgrid/mail": "^8.1.6",
     "bcrypt": "^6.0.0",
     "cloudinary": "^1.41.3",
     "connect-flash": "^0.1.1",

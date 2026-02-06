@@ -1,30 +1,39 @@
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 
-// Create a transporter object using SMTP transport
+// Initialize SendGrid with API key
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+}
+
+/**
+ * SendGrid mail transporter
+ * Returns an object with sendMail method compatible with nodemailer interface
+ */
 const createTransporter = () => {
-  return nodemailer.createTransport({
-    service: process.env.MAIL_SERVICE || 'gmail',
-    host: process.env.MAIL_HOST || 'smtp.gmail.com',
-    port: process.env.MAIL_PORT || 465, // Use 465 for SSL (more reliable)
-    secure: true, // true for 465 (SSL), false for 587 (TLS)
-    auth: {
-      user: process.env.MAIL_USER,
-      pass: process.env.MAIL_PASSWORD,
+  return {
+    sendMail: async (mailOptions) => {
+      try {
+        // Use SendGrid's send method
+        const msg = {
+          to: mailOptions.to,
+          from: mailOptions.from,
+          subject: mailOptions.subject,
+          text: mailOptions.text,
+          html: mailOptions.html,
+        };
+
+        const result = await sgMail.send(msg);
+        
+        // Return result in nodemailer format
+        return {
+          messageId: result[0].headers['x-message-id'],
+          response: result[0].statusCode,
+        };
+      } catch (error) {
+        throw error;
+      }
     },
-    connectionUrl: process.env.MAIL_CONNECTION_URL,
-    // Connection pooling and retry configuration
-    pool: {
-      maxConnections: 5,
-      maxMessages: 100,
-      rateDelta: 4000,
-      rateLimit: 14,
-    },
-    connectionTimeout: 10000, // 10 seconds
-    socketTimeout: 10000, // 10 seconds
-    greetingTimeout: 10000, // 10 seconds
-    logger: true, // Enable logging
-    debug: process.env.NODE_ENV === 'development', // Debug in development
-  });
+  };
 };
 
 module.exports = createTransporter;
