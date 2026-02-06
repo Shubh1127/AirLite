@@ -25,27 +25,32 @@ const verifyWebhookSignature = (secret, body, signature) => {
  */
 exports.handleWebhook = async (req, res) => {
   try {
+    // Convert raw body buffer to string for signature verification
+    const rawBody = req.body.toString('utf8');
+    
+    // Parse JSON for processing
+    const bodyData = JSON.parse(rawBody);
+    
     // Log webhook receipt
     console.log('=====================================');
     console.log('🔔 WEBHOOK RECEIVED FROM RAZORPAY');
     console.log('=====================================');
     console.log('Timestamp:', new Date().toISOString());
-    console.log('Event Type:', req.body.event);
-    console.log('Refund ID:', req.body.payload?.refund?.id);
+    console.log('Event Type:', bodyData.event);
+    console.log('Payload:', JSON.stringify(bodyData.payload, null, 2));
 
-    // Verify webhook signature
-    const razorapaySignature = req.headers['x-razorpay-signature'];
-    const body = JSON.stringify(req.body);
+    // Verify webhook signature using raw body
+    const razorpaySignature = req.headers['x-razorpay-signature'];
 
-    if (!verifyWebhookSignature(process.env.RAZORPAY_WEBHOOK_SECRET, body, razorapaySignature)) {
+    if (!verifyWebhookSignature(process.env.RAZORPAY_WEBHOOK_SECRET, rawBody, razorpaySignature)) {
       console.error('❌ WEBHOOK VERIFICATION FAILED: Invalid signature');
       return res.status(401).json({ message: 'Invalid signature' });
     }
 
     console.log('✅ WEBHOOK SIGNATURE VERIFIED');
 
-    const event = req.body.event;
-    const payload = req.body.payload;
+    const event = bodyData.event;
+    const payload = bodyData.payload;
 
     console.log(`\n📨 Processing webhook event: ${event}`);
 

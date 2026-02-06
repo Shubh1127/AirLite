@@ -45,6 +45,9 @@ app.use(
   })
 );
 
+// Webhook route MUST be registered BEFORE express.json() to preserve raw body for signature verification
+app.use("/api/webhooks", express.raw({ type: 'application/json' }), webhookRoutes);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -56,7 +59,7 @@ app.use("/api/listings", listingRoutes);
 app.use("/api/listings/:id/reviews", reviewRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/wishlist", wishlistRoutes);
-app.use("/api/webhooks", webhookRoutes);
+// Webhook route registered earlier (before express.json middleware)
 
 /* =========================
    HEALTH CHECK
