@@ -37,10 +37,10 @@ export default function ProfileLayout({
   return (
     <main className="min-h-screen bg-white">
       <div className="max-w-6xl mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1  md:grid-cols-4 gap-8">
           {/* Left Sidebar */}
-          <div className="hidden md:block md:col-span-1">
-            <nav className="space-y-4">
+          <div className="hidden  md:block md:col-span-1">
+            <nav className="space-y-4 sticky top-12 self-start">
               <Link
                 href="/users/profile"
                 className={`block text-left px-4 py-3 rounded-lg w-full transition ${
@@ -63,7 +63,7 @@ export default function ProfileLayout({
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <span>✈️</span> Past trips
+                  <span>✈️</span> Trips
                 </div>
               </Link>
 
@@ -76,7 +76,7 @@ export default function ProfileLayout({
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <span>👥</span> Reservation
+                  <span>👥</span> Upcoming
                 </div>
               </Link>
               {

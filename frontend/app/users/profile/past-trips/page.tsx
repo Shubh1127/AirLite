@@ -15,6 +15,8 @@ export default function PastTripsPage() {
   const { isAuthenticated, hasHydrated, token } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [pastTrips, setPastTrips] = useState<any[]>([]);
+  const [filteredTrips, setFilteredTrips] = useState<any[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'ongoing' | 'completed' | 'canceled'>('all');
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -54,12 +56,19 @@ export default function PastTripsPage() {
 
         const data = await response.json();
         
-        // Filter only past trips where checkout date has passed
+        // Filter past trips (check-in date passed) and canceled/refunded reservations
         const now = new Date();
+        now.setHours(0, 0, 0, 0); // Reset to start of day for accurate comparison
         const filtered = (Array.isArray(data) ? data : []).filter((trip) => {
-          if (!trip.checkOutDate) return false;
-          const checkOutDate = new Date(trip.checkOutDate);
-          return checkOutDate < now;
+          // Include canceled, refunded, and refund-pending reservations
+          if (trip.status === 'cancelled' || trip.status === 'refunded' || trip.status === 'refund-pending') {
+            return true;
+          }
+          // Include trips where check-in date has passed (including current ongoing trips)
+          if (!trip.checkInDate) return false;
+          const checkInDate = new Date(trip.checkInDate);
+          checkInDate.setHours(0, 0, 0, 0);
+          return checkInDate < now;
         });
 
         setPastTrips(filtered);
@@ -73,6 +82,46 @@ export default function PastTripsPage() {
 
     fetchPastTrips();
   }, [hasHydrated, isAuthenticated, router, token]);
+
+  // console.log("Fetched past trips:", pastTrips);
+  // console.log("Status filter:", statusFilter);
+
+  // Filter trips based on selected status
+  useEffect(() => {
+    if (statusFilter === 'all') {
+      setFilteredTrips(pastTrips);
+    } else if (statusFilter === 'ongoing') {
+      // Ongoing trips: confirmed status and check-in passed but checkout hasn't
+      const now = new Date();
+      setFilteredTrips(pastTrips.filter(trip => {
+        if (trip.status !== 'confirmed') return false;
+        const checkIn = trip.checkInDate ? new Date(trip.checkInDate) : null;
+        const checkOut = trip.checkOutDate ? new Date(trip.checkOutDate) : null;
+        return checkIn && checkIn < now && checkOut && checkOut > now;
+      }));
+    } else if (statusFilter === 'completed') {
+      // Completed trips: where checkout date has passed
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      setFilteredTrips(pastTrips.filter(trip => {
+        // Exclude canceled/refunded/refund-pending
+        if (trip.status === 'cancelled' || trip.status === 'refunded' || trip.status === 'refund-pending') {
+          return false;
+        }
+        // Only include if checkout date has passed
+        if (!trip.checkOutDate) return false;
+        const checkOutDate = new Date(trip.checkOutDate);
+        checkOutDate.setHours(0, 0, 0, 0);
+        return checkOutDate < now;
+      }));
+    } else if (statusFilter === 'canceled') {
+      setFilteredTrips(pastTrips.filter(trip => 
+        trip.status === 'cancelled' || 
+        trip.status === 'refunded' || 
+        trip.status === 'refund-pending'
+      ));
+    }
+  }, [statusFilter, pastTrips]);
 
   const openReviewModal = (trip: any) => {
     setSelectedTrip(trip);
@@ -200,7 +249,52 @@ export default function PastTripsPage() {
         >
           <ChevronLeft className="w-5 h-5 text-neutral-700" />
         </button>
-        <h1 className="text-2xl font-bold mt-4">Past trips</h1>
+        <h1 className="text-2xl font-bold mt-4">Past & Ongoing Trips</h1>
+        <p className="text-sm text-neutral-500 mt-1">Trips after check-in date has passed</p>
+        
+        {/* Filter Buttons */}
+        <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
+          <button
+            onClick={() => setStatusFilter('all')}
+            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${
+              statusFilter === 'all'
+                ? 'bg-neutral-900 text-white'
+                : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setStatusFilter('ongoing')}
+            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${
+              statusFilter === 'ongoing'
+                ? 'bg-blue-500 text-white'
+                : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+            }`}
+          >
+            Ongoing
+          </button>
+          <button
+            onClick={() => setStatusFilter('completed')}
+            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${
+              statusFilter === 'completed'
+                ? 'bg-green-500 text-white'
+                : 'bg-green-50 text-green-700 hover:bg-green-100'
+            }`}
+          >
+            Completed
+          </button>
+          <button
+            onClick={() => setStatusFilter('canceled')}
+            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${
+              statusFilter === 'canceled'
+                ? 'bg-red-500 text-white'
+                : 'bg-red-50 text-red-700 hover:bg-red-100'
+            }`}
+          >
+            Canceled
+          </button>
+        </div>
       </div>
       
       {pastTrips.length === 0 ? (
@@ -213,7 +307,7 @@ export default function PastTripsPage() {
             />
           </div>
           <p className="mt-6 text-sm text-neutral-600">
-            You’ll find your past reservations here after you’ve taken your first trip on Airbnb.
+            You'll find your ongoing, completed and canceled trips here.
           </p>
           <Link
             href="/"
@@ -222,9 +316,15 @@ export default function PastTripsPage() {
             Book a trip
           </Link>
         </div>
+      ) : filteredTrips.length === 0 ? (
+        <div className="px-5 mt-8 text-center">
+          <p className="text-sm text-neutral-600">
+            No trips found for the selected filter.
+          </p>
+        </div>
       ) : (
         <div className="px-5 mt-6 space-y-6">
-          {pastTrips.map((trip) => {
+          {filteredTrips.map((trip) => {
             const listing = trip.listing || {};
             const checkIn = trip.checkInDate ? new Date(trip.checkInDate) : null;
             const checkOut = trip.checkOutDate ? new Date(trip.checkOutDate) : null;
@@ -260,8 +360,18 @@ export default function PastTripsPage() {
                           {listing.country ? `, ${listing.country}` : ''}
                         </p>
                       </div>
-                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
-                        Completed
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        trip.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                        trip.status === 'refund-pending' ? 'bg-orange-100 text-orange-700' :
+                        trip.status === 'refunded' ? 'bg-purple-100 text-purple-700' :
+                        trip.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {trip.status === 'cancelled' ? 'Cancelled' :
+                         trip.status === 'refund-pending' ? 'Refund Pending' :
+                         trip.status === 'refunded' ? 'Refunded' :
+                         trip.status === 'confirmed' ? 'In Progress' :
+                         'Completed'}
                       </span>
                     </div>
 
@@ -304,22 +414,45 @@ export default function PastTripsPage() {
                     {/* Price */}
                     <div className="pt-4 border-t border-neutral-200">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-neutral-600">Total amount paid</span>
+                        <span className="text-sm text-neutral-600">
+                          {trip.status === 'cancelled' || trip.status === 'refunded' || trip.status === 'refund-pending' 
+                            ? 'Refund amount' 
+                            : 'Total amount paid'}
+                        </span>
                         <span className="text-2xl font-bold text-neutral-900">
-                          ₹{Number(trip.totalAmount || 0).toLocaleString()}
+                          ₹{Number(
+                            (trip.status === 'cancelled' || trip.status === 'refunded' || trip.status === 'refund-pending')
+                              ? (trip.refundAmount || 0)
+                              : (trip.totalAmount || 0)
+                          ).toLocaleString()}
                         </span>
                       </div>
+                      {(trip.status === 'cancelled' || trip.status === 'refunded' || trip.status === 'refund-pending') && trip.refundPercentage !== undefined && (
+                        <p className="text-xs text-neutral-500 mt-2">
+                          Refund: {trip.refundPercentage}% of ₹{Number(trip.totalAmount || 0).toLocaleString()}
+                        </p>
+                      )}
                     </div>
 
-                    {/* Action Button - Write Review */}
-                    <div className="mt-4">
-                      <button
-                        onClick={() => openReviewModal(trip)}
-                        className="px-6 py-2 border border-neutral-300 rounded-lg hover:bg-gray-50 transition text-sm font-semibold"
-                      >
-                        Write a review
-                      </button>
-                    </div>
+                    {/* Action Button - Write Review (only for completed trips or trips where checkout has passed) */}
+                    {(trip.status === 'completed' || (trip.checkOutDate && new Date(trip.checkOutDate) < new Date())) && (
+                      <div className="mt-4">
+                        <button
+                          onClick={() => openReviewModal(trip)}
+                          className="px-6 py-2 border border-neutral-300 rounded-lg hover:bg-gray-50 transition text-sm font-semibold"
+                        >
+                          Write a review
+                        </button>
+                      </div>
+                    )}
+                    
+                    {/* Cancellation Reason */}
+                    {trip.cancellationReason && (
+                      <div className="mt-4 p-3 bg-red-50 rounded-lg border border-red-200">
+                        <p className="text-xs text-red-500 font-semibold uppercase mb-1">Cancellation Reason</p>
+                        <p className="text-sm text-red-700">{trip.cancellationReason}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

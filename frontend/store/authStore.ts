@@ -12,6 +12,8 @@ export interface User {
     publicId:string,
     url:string
   }
+  isEmailVerified?: boolean;
+  provider?: string;
 }
 
 interface AuthStore {

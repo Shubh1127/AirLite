@@ -1545,7 +1545,13 @@ export default function ListingDetailPage() {
             )}
 
             <h4 className="font-semibold mb-4">Host details</h4>
+
             <div className="space-y-2 text-sm mb-6">
+              <p>
+                {
+                  listing.hostDetails?.hostProfile?.hostBio
+                }
+              </p>
               <p>
                 Response rate:{" "}
                 {listing.hostDetails?.hostProfile?.responseStats?.responseRate ||

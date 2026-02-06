@@ -5,15 +5,19 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { format, differenceInDays, addDays, isBefore } from 'date-fns';
 import Link from 'next/link';
-import { X, Calendar, AlertCircle, CheckCircle, Clock, XCircle, RefreshCw, ChevronLeft } from 'lucide-react';
+import { X, Calendar, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { getMyReservations, cancelReservation, editReservation, checkRefundStatus, type Reservation } from '@/lib/reservations';
+import CancellationModal from '@/components/reservations/CancellationModal';
+import ReservationDetailsPanel from '@/components/reservations/ReservationDetailsPanel';
+import { getMyReservations, cancelReservation, editReservation, checkRefundStatus, getCancellationInfo, type Reservation, type Cancellation } from '@/lib/reservations';
 
 export default function ReservationsPage() {
   const router = useRouter();
   const { isAuthenticated, hasHydrated, token } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [cancellationInfoMap, setCancellationInfoMap] = useState<Record<string, Cancellation>>({});
+  const [cancellationLoading, setCancellationLoading] = useState<Record<string, boolean>>({});
   const [cancelModal, setCancelModal] = useState<{ open: boolean; reservation: Reservation | null }>({
     open: false,
     reservation: null,
@@ -22,9 +26,12 @@ export default function ReservationsPage() {
     open: false,
     reservation: null,
   });
+  const [detailsPanel, setDetailsPanel] = useState<{ open: boolean; reservation: Reservation | null }>({
+    open: false,
+    reservation: null,
+  });
   const [cancelling, setCancelling] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
   const [newCheckIn, setNewCheckIn] = useState('');
   const [newCheckOut, setNewCheckOut] = useState('');
 
@@ -43,7 +50,45 @@ export default function ReservationsPage() {
     try {
       setLoading(true);
       const data = await getMyReservations();
-      setReservations(data);
+      // Filter out canceled/refunded reservations and those where check-in has passed
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const activeReservations = data.filter((reservation: Reservation) => {
+        // Exclude canceled/refunded reservations
+        if (reservation.status === 'cancelled' || 
+            reservation.status === 'refunded' || 
+            reservation.status === 'refund-pending') {
+          return false;
+        }
+        // Exclude reservations where check-in date has passed
+        if (reservation.checkInDate) {
+          const checkInDate = new Date(reservation.checkInDate);
+          checkInDate.setHours(0, 0, 0, 0);
+          if (checkInDate < now) {
+            return false;
+          }
+        }
+        return true;
+      });
+      setReservations(activeReservations);
+
+      // Fetch cancellation info for cancelled reservations
+      const cancellationMap: Record<string, Cancellation> = {};
+      for (const reservation of data) {
+        if (
+          reservation.status === 'cancelled' ||
+          reservation.status === 'refund-pending' ||
+          reservation.status === 'refunded'
+        ) {
+          try {
+            const cancellationInfo = await getCancellationInfo(reservation._id);
+            cancellationMap[reservation._id] = cancellationInfo;
+          } catch (error) {
+            console.error(`Failed to fetch cancellation info for ${reservation._id}:`, error);
+          }
+        }
+      }
+      setCancellationInfoMap(cancellationMap);
     } catch (error) {
       console.error('Error fetching reservations:', error);
       setReservations([]);
@@ -54,7 +99,6 @@ export default function ReservationsPage() {
 
   const handleCancelClick = (reservation: Reservation) => {
     setCancelModal({ open: true, reservation });
-    setCancelReason('');
   };
 
   const handleEditClick = (reservation: Reservation) => {
@@ -63,15 +107,15 @@ export default function ReservationsPage() {
     setNewCheckOut(reservation.checkOutDate.split('T')[0]);
   };
 
-  const handleConfirmCancel = async () => {
-    if (!cancelModal.reservation || !cancelReason.trim()) {
+  const handleConfirmCancel = async (reason: string) => {
+    if (!cancelModal.reservation || !reason.trim()) {
       alert('Please provide a cancellation reason');
       return;
     }
 
     try {
       setCancelling(true);
-      await cancelReservation(cancelModal.reservation._id, cancelReason);
+      await cancelReservation(cancelModal.reservation._id, reason);
       await fetchReservations();
       setCancelModal({ open: false, reservation: null });
       alert('Reservation cancelled successfully');
@@ -111,41 +155,6 @@ export default function ReservationsPage() {
     }
   };
 
-  const getRefundPercentage = (reservation: Reservation): number => {
-    if (!reservation.listing?.cancellationPolicy) return 0;
-
-    const daysUntilCheckIn = differenceInDays(
-      new Date(reservation.checkInDate),
-      new Date()
-    );
-
-    const policy = reservation.listing.cancellationPolicy;
-    const refundMap = policy.refundPercentages || {};
-
-    // Check each threshold in the policy
-    if (policy.type === 'flexible') {
-      if (daysUntilCheckIn >= 1) return refundMap['24hours'] || 100;
-      if (daysUntilCheckIn >= 7) return refundMap['7days'] || 50;
-      return refundMap['default'] || 0;
-    } else if (policy.type === 'moderate') {
-      if (daysUntilCheckIn >= 5) return refundMap['5days'] || 100;
-      if (daysUntilCheckIn >= 1) return refundMap['24hours'] || 50;
-      return refundMap['default'] || 0;
-    } else if (policy.type === 'strict') {
-      if (daysUntilCheckIn >= 14) return refundMap['14days'] || 100;
-      if (daysUntilCheckIn >= 7) return refundMap['7days'] || 50;
-      return refundMap['default'] || 0;
-    }
-
-    return refundMap['default'] || 0;
-  };
-
-  const canEditReservation = (reservation: Reservation): boolean => {
-    if (reservation.status !== 'confirmed') return false;
-    const hoursUntilCheckIn = differenceInDays(new Date(reservation.checkInDate), new Date()) * 24;
-    return hoursUntilCheckIn >= 48;
-  };
-
   const canCancelReservation = (reservation: Reservation): boolean => {
     return reservation.status === 'confirmed' && isBefore(new Date(), new Date(reservation.checkInDate));
   };
@@ -166,19 +175,6 @@ export default function ReservationsPage() {
         return 'bg-purple-100 text-purple-700';
       default:
         return 'bg-gray-100 text-gray-700';
-    }
-  };
-
-  const getRefundStatusIcon = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return <Clock className="w-4 h-4" />;
-      case 'processed':
-        return <CheckCircle className="w-4 h-4" />;
-      case 'failed':
-        return <XCircle className="w-4 h-4" />;
-      default:
-        return <RefreshCw className="w-4 h-4" />;
     }
   };
 
@@ -210,7 +206,8 @@ export default function ReservationsPage() {
         >
           <ChevronLeft className="w-5 h-5 text-neutral-700" />
         </button>
-        <h1 className="text-2xl font-bold mt-4">Reservations</h1>
+        <h1 className="text-2xl font-bold mt-4">Upcoming Reservations</h1>
+        <p className="text-sm text-neutral-500 mt-1">Reservations before check-in date</p>
       </div>
       
       {reservations.length === 0 ? (
@@ -223,7 +220,7 @@ export default function ReservationsPage() {
             />
           </div>
           <p className="mt-6 text-sm text-neutral-600">
-            You’ll find your reservations here after you’ve taken your first trip on Airbnb.
+            You have no upcoming reservations. Once check-in date passes, reservations will move to Trips section.
           </p>
           <Link
             href="/"
@@ -233,22 +230,22 @@ export default function ReservationsPage() {
           </Link>
         </div>
       ) : (
-        <div className="px-5 mt-6 space-y-6">
+        <div className="px-5 mt-6 space-y-4">
           {reservations.map((reservation) => {
             const listing = reservation.listing || {};
             const checkIn = reservation.checkInDate ? new Date(reservation.checkInDate) : null;
             const checkOut = reservation.checkOutDate ? new Date(reservation.checkOutDate) : null;
             const totalGuests = (reservation.adults || 0) + (reservation.children || 0);
-            const refundPercentage = getRefundPercentage(reservation);
 
             return (
               <div
                 key={reservation._id}
-                className="bg-white border border-neutral-200 rounded-2xl p-6 hover:shadow-lg transition-shadow"
+                onClick={() => setDetailsPanel({ open: true, reservation })}
+                className="bg-white border border-neutral-200 rounded-2xl p-4 hover:shadow-lg transition-all cursor-pointer hover:border-neutral-300"
               >
-                <div className="flex flex-col md:flex-row gap-6">
+                <div className="flex gap-4">
                   {/* Listing Image */}
-                  <div className="w-full md:w-64 h-48 rounded-xl overflow-hidden bg-neutral-100 flex-shrink-0">
+                  <div className="w-24 h-24 md:w-32 md:h-32 rounded-xl overflow-hidden bg-neutral-100 flex-shrink-0">
                     <img
                       src={listing.images?.[0]?.url || 'https://via.placeholder.com/400x300'}
                       alt={listing.title || 'Listing'}
@@ -256,116 +253,38 @@ export default function ReservationsPage() {
                     />
                   </div>
 
-                  {/* Reservation Details */}
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="text-xl font-semibold text-neutral-900">
+                  {/* Reservation Summary */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base md:text-lg font-semibold text-neutral-900 truncate">
                           {listing.title || 'Listing'}
                         </h3>
-                        <p className="text-sm text-neutral-600">
+                        <p className="text-xs md:text-sm text-neutral-600 truncate">
                           {listing.location}
                           {listing.country ? `, ${listing.country}` : ''}
                         </p>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(reservation.status)}`}>
+                      <ChevronRight className="w-5 h-5 text-neutral-400 flex-shrink-0 ml-2" />
+                    </div>
+
+                    <div className="space-y-1 mb-2">
+                      <p className="text-xs text-neutral-600">
+                        {checkIn ? format(checkIn, 'd MMM') : 'N/A'} - {checkOut ? format(checkOut, 'd MMM yyyy') : 'N/A'}
+                      </p>
+                      <p className="text-xs text-neutral-600">
+                        {totalGuests} {totalGuests === 1 ? 'guest' : 'guests'}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(reservation.status)}`}>
                         {reservation.status}
                       </span>
+                      <span className="text-sm md:text-base font-bold text-neutral-900">
+                        ₹{Number(reservation.totalAmount || 0).toLocaleString()}
+                      </span>
                     </div>
-
-                    {/* Dates and Guests */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <p className="text-xs text-neutral-500 font-semibold uppercase mb-1">Check-in</p>
-                        <p className="text-sm font-medium">
-                          {checkIn ? format(checkIn, 'EEEE, d MMMM yyyy') : 'N/A'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-neutral-500 font-semibold uppercase mb-1">Check-out</p>
-                        <p className="text-sm font-medium">
-                          {checkOut ? format(checkOut, 'EEEE, d MMMM yyyy') : 'N/A'}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Guests */}
-                    <div className="mb-4">
-                      <p className="text-xs text-neutral-500 font-semibold uppercase mb-1">Guests</p>
-                      <p className="text-sm">
-                        {totalGuests} {totalGuests === 1 ? 'guest' : 'guests'}
-                        {reservation.infants > 0 && `, ${reservation.infants} infant${reservation.infants > 1 ? 's' : ''}`}
-                        {reservation.pets > 0 && `, ${reservation.pets} pet${reservation.pets > 1 ? 's' : ''}`}
-                      </p>
-                    </div>
-
-                    {/* Refund Info */}
-                    {(reservation.status === 'cancelled' || reservation.status === 'refund-pending' || reservation.status === 'refunded') && (
-                      <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-semibold text-blue-900">Refund Information</span>
-                          <div className="flex items-center gap-1 text-blue-700">
-                            {getRefundStatusIcon(reservation.refundStatus || 'pending')}
-                            <span className="text-xs font-medium">{reservation.refundStatus || 'pending'}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-blue-700">
-                            Refund: {reservation.refundPercentage || 0}%
-                          </span>
-                          <span className="text-lg font-bold text-blue-900">
-                            ₹{Number(reservation.refundAmount || 0).toLocaleString()}
-                          </span>
-                        </div>
-                        {reservation.refundStatus === 'pending' && (
-                          <button
-                            onClick={() => handleCheckRefundStatus(reservation._id)}
-                            className="mt-2 text-xs text-blue-600 hover:underline"
-                          >
-                            Check latest status
-                          </button>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Cancellation Reason */}
-                    {reservation.cancellationReason && (
-                      <div className="mb-4 p-3 bg-red-50 rounded-lg">
-                        <p className="text-xs text-red-500 font-semibold uppercase mb-1">Cancellation Reason</p>
-                        <p className="text-sm text-red-700">{reservation.cancellationReason}</p>
-                      </div>
-                    )}
-
-                    {/* Price */}
-                    <div className="pt-4 border-t border-neutral-200">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-neutral-600">Total amount</span>
-                        <span className="text-2xl font-bold text-neutral-900">
-                          ₹{Number(reservation.totalAmount || 0).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Action Buttons */}
-                    {( canCancelReservation(reservation)) && (
-                      <div className="flex gap-3 mt-4">
-                        {canCancelReservation(reservation) && (
-                          <button
-                            onClick={() => handleCancelClick(reservation)}
-                            className="flex-1 cursor-pointer w-max px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
-                          >
-                            Cancel Reservation
-                          </button>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Booking Date */}
-                    {reservation.createdAt && (
-                      <p className="text-xs text-neutral-500 mt-3">
-                        Booked on {format(new Date(reservation.createdAt), 'd MMM yyyy, h:mm a')}
-                      </p>
-                    )}
                   </div>
                 </div>
               </div>
@@ -374,62 +293,27 @@ export default function ReservationsPage() {
         </div>
       )}
 
-      {/* Cancel Modal */}
+      {/* Reservation Details Panel */}
+      <ReservationDetailsPanel
+        isOpen={detailsPanel.open}
+        onClose={() => setDetailsPanel({ open: false, reservation: null })}
+        reservation={detailsPanel.reservation}
+        cancellationInfo={detailsPanel.reservation ? cancellationInfoMap[detailsPanel.reservation._id] : undefined}
+        onCancel={(reservation) => {
+          setDetailsPanel({ open: false, reservation: null });
+          handleCancelClick(reservation);
+        }}
+        onCheckRefundStatus={handleCheckRefundStatus}
+      />
+
+      {/* Cancel Modal - Using New Component */}
       {cancelModal.open && cancelModal.reservation && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold">Cancel Reservation</h2>
-              <button
-                onClick={() => setCancelModal({ open: false, reservation: null })}
-                className="p-2 hover:bg-gray-100 rounded-full transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="mb-6">
-              <p className="text-sm text-gray-600 mb-4">
-                {cancelModal.reservation.listing?.cancellationPolicy?.description}
-              </p>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm font-semibold text-blue-900 mb-1">Estimated Refund</p>
-                <p className="text-2xl font-bold text-blue-700">
-                  {getRefundPercentage(cancelModal.reservation)}% - ₹
-                  {((cancelModal.reservation.totalAmount * getRefundPercentage(cancelModal.reservation)) / 100).toLocaleString()}
-                </p>
-              </div>
-            </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-2">Reason for cancellation</label>
-              <textarea
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="Please tell us why you're cancelling..."
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
-                rows={4}
-              />
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setCancelModal({ open: false, reservation: null })}
-                className="flex-1 px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-                disabled={cancelling}
-              >
-                Keep Reservation
-              </button>
-              <button
-                onClick={handleConfirmCancel}
-                disabled={cancelling || !cancelReason.trim()}
-                className="flex-1 px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {cancelling ? 'Cancelling...' : 'Cancel Reservation'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <CancellationModal
+          reservation={cancelModal.reservation}
+          onClose={() => setCancelModal({ open: false, reservation: null })}
+          onConfirm={handleConfirmCancel}
+          isLoading={cancelling}
+        />
       )}
 
       {/* Edit Modal */}

@@ -55,6 +55,25 @@ export interface Reservation {
   updatedAt: string;
 }
 
+export interface Cancellation {
+  _id: string;
+  reservation: string;
+  reason: string;
+  refundStatus: string;
+  refundAmount: number;
+  refundPercentage: number;
+  originalAmount: number;
+  daysUntilCheckIn: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  cancelledAt: string;
+  refundInitiatedAt?: string;
+  refundCompletedAt?: string;
+  cancellationPolicy?: {
+    type: string;
+    description: string;
+  };
+}
+
 export const reservationsAPI = {
   // Get user's reservations
   getMyReservations: async (token: string): Promise<Reservation[]> => {
@@ -69,7 +88,7 @@ export const reservationsAPI = {
 
   // Cancel reservation
   cancelReservation: async (reservationId: string, token: string, reason?: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/payment/cancel-reservation/${reservationId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/payments/cancel-reservation/${reservationId}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -91,7 +110,7 @@ export const reservationsAPI = {
     checkInDate: string,
     checkOutDate: string
   ) => {
-    const response = await fetch(`${API_BASE_URL}/api/payment/edit-reservation/${reservationId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/payments/edit-reservation/${reservationId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -108,12 +127,23 @@ export const reservationsAPI = {
 
   // Check refund status
   checkRefundStatus: async (reservationId: string, token: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/payment/refund-status/${reservationId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/payments/refund-status/${reservationId}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
     });
     if (!response.ok) throw new Error('Failed to check refund status');
+    return response.json();
+  },
+
+  // Get cancellation info
+  getCancellationInfo: async (reservationId: string, token: string): Promise<Cancellation> => {
+    const response = await fetch(`${API_BASE_URL}/api/payments/cancellation-info/${reservationId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) throw new Error('Failed to fetch cancellation info');
     return response.json();
   },
 };
@@ -145,4 +175,10 @@ export const checkRefundStatus = async (reservationId: string) => {
   const token = getToken();
   if (!token) throw new Error('Not authenticated');
   return reservationsAPI.checkRefundStatus(reservationId, token);
+};
+
+export const getCancellationInfo = async (reservationId: string): Promise<Cancellation> => {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
+  return reservationsAPI.getCancellationInfo(reservationId, token);
 };

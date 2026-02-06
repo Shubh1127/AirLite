@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
-import { Bell, Search, Heart, Home as HomeIcon, MessageCircle, User, Briefcase, CalendarCheck, ChevronLeft, LogOut } from 'lucide-react';
+import { Bell, Search, Heart, Home as HomeIcon, MessageCircle, User, Briefcase, CalendarCheck, ChevronLeft, LogOut, Shield } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import SecuritySettings from '@/components/profile/SecuritySettings';
 
 export default function AboutMePage() {
   const router = useRouter();
@@ -94,12 +95,20 @@ export default function AboutMePage() {
           <div className="text-sm font-semibold text-center">Wishlist</div>
         </Link>
         {(user?.role === 'host' || user?.role === 'both') && (
-          <Link href="/users/profile/listings" className="bg-white border border-neutral-200 rounded-2xl p-4 flex flex-col items-center gap-3 shadow-sm">
-            <div className="w-14 h-14 rounded-2xl bg-neutral-100 flex items-center justify-center">
-              <HomeIcon className="w-6 h-6 text-neutral-700" />
-            </div>
-            <div className="text-sm font-semibold text-center">Listings</div>
-          </Link>
+          <>
+            <Link href="/users/profile/listings" className="bg-white border border-neutral-200 rounded-2xl p-4 flex flex-col items-center gap-3 shadow-sm">
+              <div className="w-14 h-14 rounded-2xl bg-neutral-100 flex items-center justify-center">
+                <HomeIcon className="w-6 h-6 text-neutral-700" />
+              </div>
+              <div className="text-sm font-semibold text-center">Listings</div>
+            </Link>
+            <Link href="/users/profile/host-profile" className="bg-white border border-neutral-200 rounded-2xl p-4 flex flex-col items-center gap-3 shadow-sm">
+              <div className="w-14 h-14 rounded-2xl bg-neutral-100 flex items-center justify-center">
+                <Briefcase className="w-6 h-6 text-neutral-700" />
+              </div>
+              <div className="text-sm font-semibold text-center">Host Profile</div>
+            </Link>
+          </>
         )}
       </div>
 
@@ -124,6 +133,15 @@ export default function AboutMePage() {
               <User className="w-4 h-4 text-neutral-600" />
             </span>
             <span className="text-sm font-medium">Account settings</span>
+          </div>
+          <span className="text-neutral-400">›</span>
+        </Link>
+        <Link href="/users/profile/settings" className="flex items-center justify-between py-2">
+          <div className="flex items-center gap-3">
+            <span className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center">
+              <Shield className="w-4 h-4 text-neutral-600" />
+            </span>
+            <span className="text-sm font-medium">Security settings</span>
           </div>
           <span className="text-neutral-400">›</span>
         </Link>
@@ -355,6 +373,133 @@ export default function AboutMePage() {
               </div>
             </div>
           )}
+
+          {/* Security Settings Section */}
+          <div className="bg-white border border-neutral-200 rounded-2xl p-8 shadow-sm">
+            <SecuritySettings />
+          </div>
+
+          {/* Quick Actions Section */}
+          <div className="bg-white border border-neutral-200 rounded-2xl p-8 shadow-sm">
+            <h3 className="text-xl font-semibold mb-6">Quick Actions</h3>
+            <div className="space-y-4">
+              <Link 
+                href="/users/profile/edit" 
+                className="flex items-center justify-between py-3 px-4 rounded-lg hover:bg-neutral-50 transition border border-neutral-200"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center">
+                    <User className="w-5 h-5 text-neutral-600" />
+                  </div>
+                  <div>
+                    <div className="font-medium">Edit Profile</div>
+                    <div className="text-sm text-neutral-500">Update your personal information</div>
+                  </div>
+                </div>
+                <span className="text-neutral-400">›</span>
+              </Link>
+
+              <Link 
+                href="/users/profile/past-trips" 
+                className="flex items-center justify-between py-3 px-4 rounded-lg hover:bg-neutral-50 transition border border-neutral-200"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center">
+                    <Briefcase className="w-5 h-5 text-neutral-600" />
+                  </div>
+                  <div>
+                    <div className="font-medium">Past Trips</div>
+                    <div className="text-sm text-neutral-500">View your travel history</div>
+                  </div>
+                </div>
+                <span className="text-neutral-400">›</span>
+              </Link>
+
+              <Link 
+                href="/users/profile/reservation" 
+                className="flex items-center justify-between py-3 px-4 rounded-lg hover:bg-neutral-50 transition border border-neutral-200"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center">
+                    <CalendarCheck className="w-5 h-5 text-neutral-600" />
+                  </div>
+                  <div>
+                    <div className="font-medium">Reservations</div>
+                    <div className="text-sm text-neutral-500">Manage your bookings</div>
+                  </div>
+                </div>
+                <span className="text-neutral-400">›</span>
+              </Link>
+
+              <Link 
+                href="/users/profile/wishlist" 
+                className="flex items-center justify-between py-3 px-4 rounded-lg hover:bg-neutral-50 transition border border-neutral-200"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center">
+                    <Heart className="w-5 h-5 text-neutral-600" />
+                  </div>
+                  <div>
+                    <div className="font-medium">Wishlist</div>
+                    <div className="text-sm text-neutral-500">Your saved properties</div>
+                  </div>
+                </div>
+                <span className="text-neutral-400">›</span>
+              </Link>
+
+              {(user?.role === 'host' || user?.role === 'both') && (
+                <>
+                  <Link 
+                    href="/users/profile/listings" 
+                    className="flex items-center justify-between py-3 px-4 rounded-lg hover:bg-neutral-50 transition border border-neutral-200"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center">
+                        <HomeIcon className="w-5 h-5 text-neutral-600" />
+                      </div>
+                      <div>
+                        <div className="font-medium">My Listings</div>
+                        <div className="text-sm text-neutral-500">Manage your properties</div>
+                      </div>
+                    </div>
+                    <span className="text-neutral-400">›</span>
+                  </Link>
+
+                  <Link 
+                    href="/users/profile/host-profile" 
+                    className="flex items-center justify-between py-3 px-4 rounded-lg hover:bg-neutral-50 transition border border-neutral-200"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center">
+                        <Briefcase className="w-5 h-5 text-neutral-600" />
+                      </div>
+                      <div>
+                        <div className="font-medium">Host Profile</div>
+                        <div className="text-sm text-neutral-500">Update host information</div>
+                      </div>
+                    </div>
+                    <span className="text-neutral-400">›</span>
+                  </Link>
+                </>
+              )}
+
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center justify-between py-3 px-4 rounded-lg hover:bg-red-50 transition border border-red-200 text-red-600"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center">
+                    <LogOut className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-medium">Logout</div>
+                    <div className="text-sm text-red-500">Sign out of your account</div>
+                  </div>
+                </div>
+                <span className="text-red-600">›</span>
+              </button>
+            </div>
+          </div>
         </div>
       </motion.div>
     </>
