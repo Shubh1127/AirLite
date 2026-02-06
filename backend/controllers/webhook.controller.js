@@ -84,19 +84,38 @@ exports.handleWebhook = async (req, res) => {
 const handleRefundProcessed = async (payload) => {
   try {
     const refund = payload.refund;
+    const payment = payload.payment?.entity;
     const refundId = refund.id;
 
     console.log(`\n💰 PROCESSING REFUND: ${refundId}`);
     console.log(`   Amount: ₹${refund.amount / 100}`);
     console.log(`   Status: ${refund.status}`);
 
-    // Find reservation by refund transaction ID
-    const reservation = await Reservation.findOne({
-      refundTransactionId: refundId,
-    }).populate('guest').populate('listing');
+    // Try to find reservation using multiple methods:
+    // 1. First check refund notes for reservationId
+    // 2. Then check refundTransactionId field
+    // 3. Finally check payment order ID
+    
+    let reservation = null;
+    const reservationIdFromNotes = refund.notes?.reservationId;
+    
+    if (reservationIdFromNotes) {
+      console.log(`📌 Found reservationId in refund notes: ${reservationIdFromNotes}`);
+      reservation = await Reservation.findById(reservationIdFromNotes)
+        .populate('guest')
+        .populate('listing');
+    }
+    
+    if (!reservation) {
+      // Fallback: try refund transaction ID
+      reservation = await Reservation.findOne({
+        refundTransactionId: refundId,
+      }).populate('guest').populate('listing');
+    }
 
     if (!reservation) {
       console.log(`❌ Reservation not found for refund ID: ${refundId}`);
+      console.log(`   Notes: ${JSON.stringify(refund.notes)}`);
       return;
     }
 
@@ -183,13 +202,30 @@ const handleRefundFailed = async (payload) => {
     console.log(`   Amount: ₹${refund.amount / 100}`);
     console.log(`   Reason: ${refund.reason_code || 'Unknown'}`);
 
-    // Find reservation by refund transaction ID
-    const reservation = await Reservation.findOne({
-      refundTransactionId: refundId,
-    }).populate('guest').populate('listing');
+    // Try to find reservation using multiple methods:
+    // 1. First check refund notes for reservationId
+    // 2. Then check refundTransactionId field
+    
+    let reservation = null;
+    const reservationIdFromNotes = refund.notes?.reservationId;
+    
+    if (reservationIdFromNotes) {
+      console.log(`📌 Found reservationId in refund notes: ${reservationIdFromNotes}`);
+      reservation = await Reservation.findById(reservationIdFromNotes)
+        .populate('guest')
+        .populate('listing');
+    }
+    
+    if (!reservation) {
+      // Fallback: try refund transaction ID
+      reservation = await Reservation.findOne({
+        refundTransactionId: refundId,
+      }).populate('guest').populate('listing');
+    }
 
     if (!reservation) {
       console.log(`❌ Reservation not found for refund ID: ${refundId}`);
+      console.log(`   Notes: ${JSON.stringify(refund.notes)}`);
       return;
     }
 
