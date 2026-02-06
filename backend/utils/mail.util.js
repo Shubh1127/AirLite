@@ -45,13 +45,17 @@ const sendEmail = async (options, retries = 3) => {
       const info = await transporter.sendMail(mailOptions);
       console.log(`Email sent successfully (attempt ${attempt}): ${info.messageId}`);
       return info;
-      console.log(`Email sent successfully (attempt ${attempt}): ${info.messageId}`);
-      return info;
     } catch (error) {
       lastError = error;
-      console.error(`Email send attempt ${attempt}/${retries} failed:`, error.message);
+      
+      // Log detailed error information for debugging
+      if (error.response?.body?.errors) {
+        console.error(`Email send attempt ${attempt}/${retries} failed:`, JSON.stringify(error.response.body.errors, null, 2));
+      } else {
+        console.error(`Email send attempt ${attempt}/${retries} failed:`, error.message);
+      }
 
-      // Only retry on specific timeout/connection errors
+      // Only retry on specific timeout/connection errors (not auth/forbidden errors)
       if (attempt < retries && (error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED' || error.code === 'NetworkError')) {
         const delayMs = Math.pow(2, attempt - 1) * 1000; // Exponential backoff: 1s, 2s, 4s
         console.log(`Retrying in ${delayMs}ms...`);
