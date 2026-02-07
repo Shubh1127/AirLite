@@ -107,6 +107,8 @@ export const authOptions: NextAuthOptions = {
           (user as { hostProfile?: unknown }).hostProfile = data.user.hostProfile;
           user.image = data.user?.avatar?.url || user.image;
           user.avatar = data.user?.avatar || user.avatar;
+          (user as { isEmailVerified?: boolean }).isEmailVerified = data.user.isEmailVerified;
+          (user as { provider?: string }).provider = data.user.provider;
 
           return true;
         } catch (error) {
@@ -123,6 +125,8 @@ export const authOptions: NextAuthOptions = {
         token.needsAdditionalInfo = user.needsAdditionalInfo;
         token.avatarUrl = user.avatar?.url ?? user.image ?? undefined;
         token.role = user.role;
+        token.isEmailVerified = (user as any).isEmailVerified;
+        token.provider = (user as any).provider;
       }
       return token;
     },
@@ -133,6 +137,8 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role as string | undefined;
         session.accessToken = token.accessToken as string;
         session.needsAdditionalInfo = token.needsAdditionalInfo as boolean;
+        (session.user as any).isEmailVerified = token.isEmailVerified as boolean | undefined;
+        (session.user as any).provider = token.provider as string | undefined;
       }
       return session;
     },

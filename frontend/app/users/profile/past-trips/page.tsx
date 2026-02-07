@@ -16,7 +16,7 @@ export default function PastTripsPage() {
   const [loading, setLoading] = useState(true);
   const [pastTrips, setPastTrips] = useState<any[]>([]);
   const [filteredTrips, setFilteredTrips] = useState<any[]>([]);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'ongoing' | 'completed' | 'canceled'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'ongoing' | 'completed' | 'cancelled' | 'refunded'>('all');
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -56,19 +56,14 @@ export default function PastTripsPage() {
 
         const data = await response.json();
         
-        // Filter past trips (check-in date passed) and canceled/refunded reservations
+        // Filter past trips: Include all except pending
         const now = new Date();
-        now.setHours(0, 0, 0, 0); // Reset to start of day for accurate comparison
+        now.setHours(0, 0, 0, 0);
         const filtered = (Array.isArray(data) ? data : []).filter((trip) => {
-          // Include canceled, refunded, and refund-pending reservations
-          if (trip.status === 'cancelled' || trip.status === 'refunded' || trip.status === 'refund-pending') {
-            return true;
-          }
-          // Include trips where check-in date has passed (including current ongoing trips)
-          if (!trip.checkInDate) return false;
-          const checkInDate = new Date(trip.checkInDate);
-          checkInDate.setHours(0, 0, 0, 0);
-          return checkInDate < now;
+          // Exclude pending reservations
+          if (trip.status === 'pending') return false;
+          // Include confirmed, completed, and all refund-related statuses
+          return true;
         });
 
         setPastTrips(filtered);
@@ -91,34 +86,23 @@ export default function PastTripsPage() {
     if (statusFilter === 'all') {
       setFilteredTrips(pastTrips);
     } else if (statusFilter === 'ongoing') {
-      // Ongoing trips: confirmed status and check-in passed but checkout hasn't
+      // Ongoing trips: confirmed status with check-in passed but checkout hasn't
       const now = new Date();
       setFilteredTrips(pastTrips.filter(trip => {
         if (trip.status !== 'confirmed') return false;
-        const checkIn = trip.checkInDate ? new Date(trip.checkInDate) : null;
         const checkOut = trip.checkOutDate ? new Date(trip.checkOutDate) : null;
-        return checkIn && checkIn < now && checkOut && checkOut > now;
+        return checkOut && checkOut > now;
       }));
     } else if (statusFilter === 'completed') {
-      // Completed trips: where checkout date has passed
-      const now = new Date();
-      now.setHours(0, 0, 0, 0);
-      setFilteredTrips(pastTrips.filter(trip => {
-        // Exclude canceled/refunded/refund-pending
-        if (trip.status === 'cancelled' || trip.status === 'refunded' || trip.status === 'refund-pending') {
-          return false;
-        }
-        // Only include if checkout date has passed
-        if (!trip.checkOutDate) return false;
-        const checkOutDate = new Date(trip.checkOutDate);
-        checkOutDate.setHours(0, 0, 0, 0);
-        return checkOutDate < now;
-      }));
-    } else if (statusFilter === 'canceled') {
+      // Completed trips: status = 'completed'
+      setFilteredTrips(pastTrips.filter(trip => trip.status === 'completed'));
+    } else if (statusFilter === 'cancelled') {
+      // Cancelled trips: status = 'cancelled'
+      setFilteredTrips(pastTrips.filter(trip => trip.status === 'cancelled'));
+    } else if (statusFilter === 'refunded') {
+      // Refunded trips: includes refund-pending and refunded
       setFilteredTrips(pastTrips.filter(trip => 
-        trip.status === 'cancelled' || 
-        trip.status === 'refunded' || 
-        trip.status === 'refund-pending'
+        trip.status === 'refunded' || trip.status === 'refund-pending'
       ));
     }
   }, [statusFilter, pastTrips]);
@@ -285,14 +269,24 @@ export default function PastTripsPage() {
             Completed
           </button>
           <button
-            onClick={() => setStatusFilter('canceled')}
+            onClick={() => setStatusFilter('cancelled')}
             className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${
-              statusFilter === 'canceled'
+              statusFilter === 'cancelled'
                 ? 'bg-red-500 text-white'
                 : 'bg-red-50 text-red-700 hover:bg-red-100'
             }`}
           >
-            Canceled
+            Cancelled
+          </button>
+          <button
+            onClick={() => setStatusFilter('refunded')}
+            className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${
+              statusFilter === 'refunded'
+                ? 'bg-purple-500 text-white'
+                : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+            }`}
+          >
+            Refunds
           </button>
         </div>
       </div>
@@ -301,7 +295,7 @@ export default function PastTripsPage() {
         <div className="px-5 mt-8 text-center">
           <div className="mx-auto w-32 h-32 rounded-2xl overflow-hidden">
             <img
-              src="https://a0.muscache.com/im/pictures/8f9d8b02-05c9-4b8c-9f2c-47f4a2164eb7.jpg"
+              src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-trips-tab/original/c2f5127b-f701-4e2d-bbf0-d54afe17d6e3.png?im_w=1680&im_q=medq"
               alt="Past trips"
               className="w-full h-full object-contain"
             />
@@ -364,14 +358,16 @@ export default function PastTripsPage() {
                         trip.status === 'cancelled' ? 'bg-red-100 text-red-700' :
                         trip.status === 'refund-pending' ? 'bg-orange-100 text-orange-700' :
                         trip.status === 'refunded' ? 'bg-purple-100 text-purple-700' :
+                        trip.status === 'completed' ? 'bg-green-100 text-green-700' :
                         trip.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
                         'bg-gray-100 text-gray-700'
                       }`}>
                         {trip.status === 'cancelled' ? 'Cancelled' :
                          trip.status === 'refund-pending' ? 'Refund Pending' :
                          trip.status === 'refunded' ? 'Refunded' :
-                         trip.status === 'confirmed' ? 'In Progress' :
-                         'Completed'}
+                         trip.status === 'completed' ? 'Completed' :
+                         trip.status === 'confirmed' ? 'Ongoing' :
+                         trip.status}
                       </span>
                     </div>
 
@@ -434,8 +430,8 @@ export default function PastTripsPage() {
                       )}
                     </div>
 
-                    {/* Action Button - Write Review (only for completed trips or trips where checkout has passed) */}
-                    {(trip.status === 'completed' || (trip.checkOutDate && new Date(trip.checkOutDate) < new Date())) && (
+                    {/* Action Button - Write Review (only for completed trips) */}
+                    {trip.status === 'completed' && (
                       <div className="mt-4">
                         <button
                           onClick={() => openReviewModal(trip)}

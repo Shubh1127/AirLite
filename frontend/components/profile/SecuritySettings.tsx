@@ -116,7 +116,32 @@ export default function SecuritySettings() {
 
   return (
     <div className="max-w-3xl">
-      <h2 className="text-2xl font-bold mb-6">Security Settings</h2>
+      {/* Mobile: Show verification status at top for all users */}
+      <div className="lg:hidden mb-6">
+        <div className={`border rounded-lg p-4 ${isGoogleUser ? 'border-green-200 bg-green-50' : isEmailVerified ? 'border-green-200 bg-green-50' : 'border-orange-200 bg-orange-50'}`}>
+          <div className="flex items-center gap-2">
+            {(isGoogleUser || isEmailVerified) ? (
+              <>
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                <div>
+                  <p className="text-sm font-semibold text-green-900">Email Verified</p>
+                  <p className="text-xs text-green-700">{user?.email}</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <XCircle className="w-5 h-5 text-orange-600" />
+                <div>
+                  <p className="text-sm font-semibold text-orange-900">Email Not Verified</p>
+                  <p className="text-xs text-orange-700">{user?.email}</p>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <h2 className="text-2xl font-bold mb-6 hidden lg:block">Security Settings</h2>
 
       {/* Email Verification Section */}
       {!isGoogleUser && (
@@ -277,13 +302,17 @@ export default function SecuritySettings() {
       {isGoogleUser && (
         <div className="border border-blue-200 bg-blue-50 rounded-lg p-6">
           <div className="flex items-start gap-3">
-            <CheckCircle2 className="w-6 h-6 text-blue-600 mt-0.5" />
+            <CheckCircle2 className="w-6 h-6 text-blue-600 mt-0.5 flex-shrink-0" />
             <div>
               <h3 className="text-lg font-semibold text-blue-900 mb-2">Google Account</h3>
-              <p className="text-sm text-blue-800">
-                You're signed in with Google. Your email is automatically verified, and password management
+              <p className="text-sm text-blue-800 mb-3">
+                You're signed in with Google. Your email <span className="font-semibold">{user?.email}</span> is automatically verified, and password management
                 is handled through your Google account.
               </p>
+              <div className="flex items-center gap-2 text-xs text-blue-700 bg-blue-100 px-3 py-2 rounded-md w-fit">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Email verified via Google</span>
+              </div>
             </div>
           </div>
         </div>

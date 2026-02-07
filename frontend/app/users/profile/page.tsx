@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
-import { Bell, Search, Heart, Home as HomeIcon, MessageCircle, User, Briefcase, CalendarCheck, ChevronLeft, LogOut, Shield } from 'lucide-react';
+import { Bell, Search, Heart, Home as HomeIcon, MessageCircle, User, Briefcase, CalendarCheck, ChevronLeft, LogOut, Shield, CheckCircle } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import SecuritySettings from '@/components/profile/SecuritySettings';
 
@@ -21,6 +21,9 @@ export default function AboutMePage() {
     logout();
     router.push('/');
   };
+
+  // console.log(user);
+  // console.log(profile)
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -72,6 +75,12 @@ export default function AboutMePage() {
           </div>
           <h2 className="text-xl font-bold">{profile?.firstName} {profile?.lastName}</h2>
           <p className="text-sm text-neutral-500">{profile?.role === 'both' ? 'Host & Guest' : profile?.role}</p>
+          {(user?.isEmailVerified || user?.provider === 'google') && (
+            <div className="flex items-center justify-center gap-1 mt-2 text-xs text-green-600">
+              <CheckCircle className="w-3.5 h-3.5" />
+              <span>Verified</span>
+            </div>
+          )}
         </button>
       </div>
 
@@ -202,12 +211,23 @@ export default function AboutMePage() {
                   </div>
                   <h2 className="text-xl font-bold">{profile?.firstName} {profile?.lastName}</h2>
                   <p className="text-sm text-neutral-500">{profile?.role === 'both' ? 'Host & Guest' : profile?.role}</p>
+                  {(user?.isEmailVerified || user?.provider === 'google') && (
+                    <div className="flex items-center justify-center gap-1 mt-2 text-xs text-green-600">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span>Verified</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-neutral-700">Email</span>
-                    <span className="text-sm text-neutral-500">{profile?.email || '-'}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm text-neutral-500">{profile?.email || '-'}</span>
+                      {(user?.isEmailVerified || user?.provider === 'google') && (
+                        <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                      )}
+                    </div>
                   </div>
                   {profile?.phone && (
                     <div className="flex items-center justify-between">
@@ -310,12 +330,25 @@ export default function AboutMePage() {
 
               <div className="flex-1">
                 <h2 className="text-2xl font-bold mb-2">{profile?.firstName} {profile?.lastName}</h2>
-                <p className="text-neutral-600 mb-6">{profile?.role === 'both' ? 'Host & Guest' : profile?.role}</p>
+                <div className="flex items-center gap-3 mb-6">
+                  <p className="text-neutral-600">{profile?.role === 'both' ? 'Host & Guest' : profile?.role}</p>
+                  {(user?.isEmailVerified || user?.provider === 'google') && (
+                    <div className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded-md text-xs font-medium">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span>Verified</span>
+                    </div>
+                  )}
+                </div>
 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between py-3 border-b border-neutral-100">
                     <span className="text-sm font-medium text-neutral-700">Email</span>
-                    <span className="text-sm text-neutral-600">{profile?.email || '-'}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-neutral-600">{profile?.email || '-'}</span>
+                      {(user?.isEmailVerified || user?.provider === 'google') && (
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                      )}
+                    </div>
                   </div>
                   {profile?.phone && (
                     <div className="flex items-center justify-between py-3 border-b border-neutral-100">

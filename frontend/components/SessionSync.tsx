@@ -19,6 +19,8 @@ export default function SessionSync() {
         lastName: session.user.name?.split(' ')[1] || '',
         role: session.user.role,
         avatar: avatarUrl ? { url: avatarUrl } : undefined,
+        isEmailVerified: (session.user as any)?.isEmailVerified,
+        provider: (session.user as any)?.provider,
       };
       
       setUser(user as any, session.accessToken || '');

@@ -214,7 +214,7 @@ export default function ReservationsPage() {
         <div className="px-5 mt-8 text-center">
           <div className="mx-auto w-32 h-32 rounded-2xl overflow-hidden">
             <img
-              src="https://a0.muscache.com/im/pictures/8f9d8b02-05c9-4b8c-9f2c-47f4a2164eb7.jpg"
+              src="https://a0.muscache.com/im/pictures/airbnb-platform-assets/AirbnbPlatformAssets-trips-tab/original/c2f5127b-f701-4e2d-bbf0-d54afe17d6e3.png?im_w=1680&im_q=medqg"
               alt="Reservations"
               className="w-full h-full object-contain"
             />

@@ -273,8 +273,9 @@ export default function ListingDetailPage() {
 
   const totalNights = calculateNights();
   const totalPrice = listing ? listing.pricePerNight * totalNights : 0;
-  const serviceFee = totalPrice * 0.14; // 14% service fee
-  const totalWithFees = totalPrice + serviceFee;
+  const serviceFee = Math.round(totalPrice * 0.14); // 14% service fee
+  const taxes = Math.round(totalPrice * 0.05); // 5% taxes
+  const totalWithFees = totalPrice + serviceFee + taxes;
 
   if (loading) {
     return (
@@ -720,7 +721,7 @@ export default function ListingDetailPage() {
                 {format(checkInDate, 'MMM d')} - {format(checkOutDate, 'MMM d')}
               </p>
               <p className="text-sm font-semibold">
-                ₹{(listing.pricePerNight * calculateNights()).toLocaleString()} total
+                ₹{totalWithFees.toLocaleString()} total
               </p>
             </>
           ) : (
@@ -1199,7 +1200,11 @@ export default function ListingDetailPage() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="underline">Service fee</span>
-                  <span>₹{listing.serviceFee?.toLocaleString()}</span>
+                  <span>₹{serviceFee.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="underline">Taxes</span>
+                  <span>₹{taxes.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between font-semibold pt-2 border-t">
                   <span>Total</span>
@@ -2083,16 +2088,16 @@ export default function ListingDetailPage() {
                   <h3 className="font-semibold mb-4">Price details</h3>
                   <div className="space-y-3 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-neutral-600">{calculateNights()} {calculateNights() === 1 ? 'night' : 'nights'} x ₹{listing.pricePerNight?.toLocaleString()}</span>
-                      <span>₹{(listing.pricePerNight * calculateNights()).toLocaleString()}</span>
+                      <span className="text-neutral-600">{totalNights} {totalNights === 1 ? 'night' : 'nights'} x ₹{listing.pricePerNight?.toLocaleString()}</span>
+                      <span>₹{totalPrice.toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between text-green-600">
-                      <span>Special offer</span>
-                      <span>-₹{Math.round(listing.pricePerNight * calculateNights() * 0.15).toLocaleString()}</span>
+                    <div className="flex justify-between">
+                      <span className="text-neutral-600">Service fee</span>
+                      <span>₹{serviceFee.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-neutral-600">Taxes</span>
-                      <span>₹{Math.round((listing.pricePerNight * calculateNights() * 0.18)).toLocaleString()}</span>
+                      <span>₹{taxes.toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
@@ -2100,7 +2105,7 @@ export default function ListingDetailPage() {
                 {/* Total */}
                 <div className="border-t border-neutral-200 pt-4 flex items-center justify-between mb-6">
                   <p className="font-semibold text-lg">Total INR</p>
-                  <p className="font-semibold text-lg">₹{Math.round(listing.pricePerNight * calculateNights() - (listing.pricePerNight * calculateNights() * 0.15) + (listing.pricePerNight * calculateNights() * 0.18)).toLocaleString()}</p>
+                  <p className="font-semibold text-lg">₹{totalWithFees.toLocaleString()}</p>
                 </div>
 
                 {/* Price Breakdown Link */}
