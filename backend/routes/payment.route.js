@@ -26,4 +26,20 @@ router.get('/refund-status/:reservationId', isLoggedIn, paymentController.checkR
 // Get cancellation info
 router.get('/cancellation-info/:reservationId', isLoggedIn, paymentController.getCancellationInfo);
 
+/* =========================
+   REFUND MANAGEMENT ROUTES
+========================= */
+
+// Update all pending refunds from Razorpay
+router.post('/update-pending-refunds', isLoggedIn, paymentController.updatePendingRefunds);
+
+// Get pending refunds statistics
+router.get('/pending-refunds-stats', isLoggedIn, paymentController.getPendingRefundsStats);
+
+// Get list of all pending refunds (for monitoring/testing)
+router.get('/list-pending-refunds', isLoggedIn, paymentController.listPendingRefunds);
+
+// Check specific refund status from Razorpay and update if needed
+router.post('/check-refund/:reservationId', isLoggedIn, paymentController.checkSpecificRefundStatus);
+
 module.exports = router;

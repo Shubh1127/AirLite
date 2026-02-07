@@ -11,6 +11,11 @@ const {
   sendRefundInitiatedEmail,
   sendRefundSuccessfulEmail,
 } = require("../utils/mail.util");
+const {
+  updateAllPendingRefunds,
+  getPendingRefundStats,
+  checkSpecificRefund,
+} = require("../utils/refund.util");
 
 // Validate Razorpay credentials
 if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
@@ -630,3 +635,119 @@ exports.getCancellationInfo = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch cancellation info" });
   }
 };
+
+/* =========================
+   UPDATE ALL PENDING REFUNDS FROM RAZORPAY
+========================= */
+exports.updatePendingRefunds = async (req, res) => {
+  try {
+    console.log('🔄 Manual trigger: Updating all pending refunds from Razorpay');
+    
+    const result = await updateAllPendingRefunds();
+
+    res.json({
+      message: "Pending refunds checked and updated",
+      summary: result,
+    });
+  } catch (err) {
+    console.error("Update pending refunds error:", err);
+    res.status(500).json({ message: "Failed to update pending refunds" });
+  }
+};
+
+/* =========================
+   GET ALL RESERVATIONS WITH PENDING REFUNDS (FOR TESTING/MONITORING)
+========================= */
+exports.listPendingRefunds = async (req, res) => {
+  try {
+    console.log('📋 Fetching list of pending refunds...');
+
+    const pendingRefunds = await Reservation.find({
+      $or: [
+        { refundStatus: 'pending' },
+        { refundStatus: 'initiated' },
+      ],
+      refundTransactionId: { $exists: true, $ne: null },
+    })
+      .select('_id status refundStatus refundAmount refundTransactionId guest listing checkInDate checkOutDate')
+      .populate('guest', 'email firstName')
+      .populate('listing', 'title')
+      .sort({ createdAt: -1 });
+
+    console.log(`✅ Found ${pendingRefunds.length} pending refunds`);
+
+    res.json({
+      message: "Pending refunds list",
+      count: pendingRefunds.length,
+      data: pendingRefunds.map((ref) => ({
+        reservationId: ref._id,
+        guestEmail: ref.guest?.email || 'Unknown',
+        guestName: ref.guest?.firstName || 'Unknown',
+        listingTitle: ref.listing?.title || 'Unknown',
+        status: ref.status,
+        refundStatus: ref.refundStatus,
+        refundAmount: `₹${ref.refundAmount}`,
+        refundTransactionId: ref.refundTransactionId,
+        checkInDate: ref.checkInDate,
+        checkOutDate: ref.checkOutDate,
+      })),
+    });
+  } catch (err) {
+    console.error("List pending refunds error:", err);
+    res.status(500).json({ message: "Failed to fetch pending refunds" });
+  }
+};
+
+
+/* =========================
+   GET PENDING REFUNDS STATISTICS
+========================= */
+exports.getPendingRefundsStats = async (req, res) => {
+  try {
+    const stats = await getPendingRefundStats();
+
+    res.json({
+      message: "Pending refunds statistics",
+      data: stats,
+    });
+  } catch (err) {
+    console.error("Get pending refunds stats error:", err);
+    res.status(500).json({ message: "Failed to fetch pending refunds stats" });
+  }
+};
+
+/* =========================
+   CHECK SPECIFIC REFUND STATUS FROM RAZORPAY
+========================= */
+exports.checkSpecificRefundStatus = async (req, res) => {
+  try {
+    const { reservationId } = req.params;
+
+    // Verify authorization - only admins or the guest can check
+    const reservation = await Reservation.findById(reservationId);
+
+    if (!reservation) {
+      return res.status(404).json({ message: "Reservation not found" });
+    }
+
+    // Allow if user is the guest or is an admin (implement admin check if needed)
+    if (reservation.guest.toString() !== req.user.id && !req.user.isAdmin) {
+      return res.status(403).json({ message: "Not authorized to check this refund" });
+    }
+
+    const result = await checkSpecificRefund(reservationId);
+
+    if (result.error) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    res.json({
+      message: "Refund status checked and updated",
+      reservation: result,
+    });
+  } catch (err) {
+    console.error("Check specific refund status error:", err);
+    res.status(500).json({ message: "Failed to check refund status" });
+  }
+};
+

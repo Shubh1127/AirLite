@@ -17,6 +17,7 @@ const wishlistRoutes = require("./routes/wishlist.route");
 const webhookRoutes = require("./routes/webhook.route");
 
 const ExpressError = require("./utils/ExpressError.util");
+const { initializeScheduler } = require("./utils/scheduler.util");
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -91,4 +92,7 @@ app.use((err, req, res, next) => {
 ========================= */
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  
+  // Initialize background scheduler for periodic tasks (e.g., refund status checks)
+  initializeScheduler();
 });

@@ -267,6 +267,8 @@ exports.googleOAuth = async (req, res) => {
         role: user.role,
         profile: user.profile,
         avatar: user.avatar,
+        isEmailVerified: user.isEmailVerified,
+        provider: user.provider,
       },
       needsAdditionalInfo: !user.phone || !user.dateOfBirth,
     });
@@ -322,6 +324,19 @@ exports.getMyReviews = async (req, res) => {
 ========================= */
 exports.getMyTrips = async (req, res) => {
   try {
+    // Auto-update confirmed reservations to 'completed' if checkout date has passed
+    const now = new Date();
+    await Reservation.updateMany(
+      {
+        guest: req.user.id,
+        status: 'confirmed',
+        checkOutDate: { $lt: now }
+      },
+      {
+        status: 'completed'
+      }
+    );
+
     const trips = await Reservation.find({ guest: req.user.id })
       .populate({
         path: "listing",
