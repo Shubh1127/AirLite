@@ -10,6 +10,7 @@ const {
   sendReservationCancelledEmail,
   sendRefundInitiatedEmail,
   sendRefundSuccessfulEmail,
+  sendReservationDetailsEmail,
 } = require("../utils/mail.util");
 const {
   updateAllPendingRefunds,
@@ -167,12 +168,24 @@ exports.verifyPayment = async (req, res) => {
             (1000 * 60 * 60 * 24),
         ),
         totalPrice: reservation.totalAmount,
+        adults: reservation.adults,
+        children: reservation.children,
+        infants: reservation.infants,
+        guestMessage: reservation.guestMessage,
+        totalAmount: reservation.totalAmount,
       };
 
       const listingObj = {
         _id: listing._id,
         title: listing.title,
         location: listing.location,
+        category: listing.category,
+        maxGuests: listing.maxGuests,
+        bedrooms: listing.bedrooms,
+        beds: listing.beds,
+        bathrooms: listing.bathrooms,
+        amenities: listing.amenities,
+        address: listing.address,
       };
 
       const paymentObj = {
@@ -182,13 +195,44 @@ exports.verifyPayment = async (req, res) => {
         method: "Razorpay",
       };
 
-      // Send both emails with a small delay between them
+      // Fetch host information from listing owner (if available)
+      let hostObj = null;
+      if (listing.owner) {
+        const host = await User.findById(listing.owner).select('-password');
+        hostObj = {
+          firstName: host?.firstName || 'Host',
+          email: host?.email || '',
+          phone: host?.phone || '',
+          hostProfile: host?.hostProfile || {},
+          bio: host?.bio || '',
+          name: host?.firstName || '',
+        };
+      } else {
+        hostObj = {
+          firstName: 'Host',
+          email: '',
+          phone: '',
+          hostProfile: {},
+          bio: '',
+          name: 'Host',
+        };
+      }
+
+      // Send multiple emails with delays to avoid rate limiting
       console.log('Attempting to send reservation confirmation email...');
       sendReservationEmail(userObj, reservationObj, listingObj)
         .then(() => console.log('✅ Reservation email sent successfully'))
         .catch((err) => console.error("❌ Failed to send reservation email:", err.message || err));
 
-      // Small delay before sending second email to avoid rate limiting
+      // Send detailed reservation email after 1 second
+      setTimeout(() => {
+        console.log('Attempting to send detailed reservation email...');
+        sendReservationDetailsEmail(userObj, reservationObj, listingObj, hostObj)
+          .then(() => console.log('✅ Detailed reservation email sent successfully'))
+          .catch((err) => console.error("❌ Failed to send detailed reservation email:", err.message || err));
+      }, 1000); // 1 second delay
+
+      // Send payment success email after 2 seconds
       setTimeout(() => {
         console.log('Attempting to send payment success email...');
         sendPaymentSuccessEmail(
@@ -199,7 +243,7 @@ exports.verifyPayment = async (req, res) => {
         )
           .then(() => console.log('✅ Payment success email sent successfully'))
           .catch((err) => console.error("❌ Failed to send payment success email:", err.message || err));
-      }, 1000); // 1 second delay
+      }, 2000); // 2 second delay
     }
 
     res.json({

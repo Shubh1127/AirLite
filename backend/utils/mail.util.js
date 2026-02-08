@@ -10,6 +10,7 @@ const {
   refundInitiatedTemplate,
   refundSuccessfulTemplate,
   refundFailedTemplate,
+  reservationDetailsTemplate,
 } = require('./emailTemplates');
 
 /**
@@ -193,6 +194,19 @@ const sendRefundFailedEmail = async (user, reservation, listing, refundInfo) => 
   });
 };
 
+/**
+ * Send detailed reservation confirmation email with complete booking information
+ * Includes listing details, location, host info, and all booking details
+ */
+const sendReservationDetailsEmail = async (user, reservation, listing, host) => {
+  const html = reservationDetailsTemplate(user, reservation, listing, host);
+  return sendEmail({
+    to: user.email,
+    subject: 'Your Reservation Confirmed! 🎉 - Complete Details',
+    html,
+  });
+};
+
 module.exports = {
   sendEmail,
   sendSignupEmail,
@@ -205,4 +219,5 @@ module.exports = {
   sendRefundInitiatedEmail,
   sendRefundSuccessfulEmail,
   sendRefundFailedEmail,
+  sendReservationDetailsEmail,
 };

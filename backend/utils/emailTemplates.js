@@ -465,6 +465,104 @@ const refundFailedTemplate = (user, reservation, listing, refundInfo) => {
   return baseTemplate(content);
 };
 
+/**
+ * Reservation Details Email Template - Sent on successful reservation
+ * Includes complete listing, location, host, and booking information
+ */
+const reservationDetailsTemplate = (user, reservation, listing, host) => {
+  const checkIn = new Date(reservation.checkInDate).toLocaleDateString('en-US', { 
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+  });
+  const checkOut = new Date(reservation.checkOutDate).toLocaleDateString('en-US', { 
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+  });
+  
+  const numberOfNights = Math.ceil(
+    (new Date(reservation.checkOutDate) - new Date(reservation.checkInDate)) / (1000 * 60 * 60 * 24)
+  );
+  
+  const totalGuests = (reservation.adults || 1) + (reservation.children || 0) + (reservation.infants || 0);
+
+  const content = `
+    <h1>Your Reservation is Confirmed! 🎉</h1>
+    <p>Hi ${user.name || user.username},</p>
+    <p>Congratulations! Your reservation at <strong>${listing.title}</strong> has been successfully confirmed. We're excited for your upcoming stay!</p>
+
+    <hr class="divider">
+
+    <h2 style="color: #667eea; font-size: 20px; margin-top: 30px;">📅 Booking Details</h2>
+    <div class="info-box">
+      <p><strong>Check-in Date:</strong> ${checkIn}</p>
+      <p><strong>Check-out Date:</strong> ${checkOut}</p>
+      <p><strong>Number of Nights:</strong> ${numberOfNights}</p>
+      <p><strong>Guests:</strong> ${totalGuests} ${totalGuests === 1 ? 'guest' : 'guests'} (${reservation.adults || 1} adult${(reservation.adults || 1) > 1 ? 's' : ''}${reservation.children ? ', ' + reservation.children + ' child' + (reservation.children > 1 ? 'ren' : '') : ''}${reservation.infants ? ', ' + reservation.infants + ' infant' + (reservation.infants > 1 ? 's' : '') : ''})</p>
+      <p><strong>Reservation ID:</strong> <code style="background: #f3f4f6; padding: 4px 8px; border-radius: 4px;">${reservation._id}</code></p>
+    </div>
+
+    <h2 style="color: #667eea; font-size: 20px; margin-top: 30px;">🏠 Property Information</h2>
+    <div class="info-box">
+      <p><strong>Property Name:</strong> ${listing.title}</p>
+      <p><strong>Category:</strong> ${listing.category || 'N/A'}</p>
+      <p><strong>Location:</strong> ${listing.location || 'N/A'}</p>
+      ${listing.address ? `<p><strong>Full Address:</strong> ${listing.address.street || ''} ${listing.address.city || ''}, ${listing.address.state || ''} ${listing.address.zipCode || ''}</p>` : ''}
+      <p><strong>Capacity:</strong> ${listing.maxGuests} guests</p>
+      <p><strong>Bedrooms:</strong> ${listing.bedrooms || 'N/A'} | <strong>Beds:</strong> ${listing.beds || 'N/A'} | <strong>Bathrooms:</strong> ${listing.bathrooms || 'N/A'}</p>
+      ${listing.amenities && listing.amenities.length > 0 ? `<p><strong>Key Amenities:</strong> ${listing.amenities.slice(0, 5).join(', ')}${listing.amenities.length > 5 ? '...' : ''}</p>` : ''}
+    </div>
+
+    <h2 style="color: #667eea; font-size: 20px; margin-top: 30px;">👤 Host Information</h2>
+    <div class="info-box" style="border-left: 4px solid #667eea;">
+      <p><strong>Host Name:</strong> ${host.firstName || host.name || 'Your Host'}</p>
+      <p><strong>Email:</strong> <a href="mailto:${host.email}" style="color: #667eea; text-decoration: none;">${host.email}</a></p>
+      ${host.phone ? `<p><strong>Phone:</strong> ${host.phone}</p>` : ''}
+      ${host.hostProfile?.hostRank ? `<p><strong>Host Status:</strong> <span style="background: #667eea; color: white; padding: 4px 8px; border-radius: 4px; font-weight: 600;">${host.hostProfile.hostRank.toUpperCase()}</span></p>` : ''}
+      ${host.bio ? `<p><strong>About Host:</strong> ${host.bio}</p>` : ''}
+    </div>
+
+    <h2 style="color: #667eea; font-size: 20px; margin-top: 30px;">💰 Booking Summary</h2>
+    <div class="info-box">
+      <p><strong>Total Amount Paid:</strong> <span style="color: #22c55e; font-size: 18px; font-weight: bold;">₹${Number(reservation.totalAmount || 0).toLocaleString('en-IN')}</span></p>
+      <p><strong>Payment Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      <p><strong>Status:</strong> <span style="background: #22c55e; color: white; padding: 4px 8px; border-radius: 4px; font-weight: 600;">CONFIRMED</span></p>
+    </div>
+
+    <h2 style="color: #667eea; font-size: 20px; margin-top: 30px;">📋 Important Information</h2>
+    <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; border-radius: 4px; margin: 20px 0;">
+      <p style="margin: 10px 0;"><strong>✓ Check-in Time:</strong> After 3:00 PM</p>
+      <p style="margin: 10px 0;"><strong>✓ Check-out Time:</strong> Before 11:00 AM</p>
+      <p style="margin: 10px 0;"><strong>✓ Special Requests:</strong> ${reservation.guestMessage || 'None'}</p>
+    </div>
+
+    <h2 style="color: #667eea; font-size: 20px; margin-top: 30px;">🎯 What to Do Next</h2>
+    <ul style="line-height: 1.8; color: #555;">
+      <li>Contact your host if you have any questions or special requests</li>
+      <li>Review the house rules and check-in instructions (coming via email)</li>
+      <li>Add your property to your device's calendar</li>
+      <li>Check that parking and directions are clear</li>
+      <li>Ensure your contact details are up to date</li>
+    </ul>
+
+    <p style="margin-top: 30px; text-align: center;">
+      <a href="${process.env.FRONTEND_URL}/dashboard/trips" class="button">View Your Reservation</a>
+    </p>
+
+    <hr class="divider">
+
+    <div style="background-color: #f0f4ff; padding: 15px; border-radius: 4px; margin-top: 30px;">
+      <p><strong>Need Help?</strong></p>
+      <p style="margin: 10px 0; color: #666;">If you have any questions about your reservation, you can:</p>
+      <ul style="color: #666; margin: 10px 0;">
+        <li><a href="${process.env.FRONTEND_URL}/dashboard/trips" style="color: #667eea; text-decoration: none;">Contact your host directly</a></li>
+        <li><a href="${process.env.FRONTEND_URL}/support" style="color: #667eea; text-decoration: none;">Visit our support center</a></li>
+        <li>Reply to this email with your questions</li>
+      </ul>
+    </div>
+
+    <p style="margin-top: 30px;">We truly appreciate your reservation with AirLite. Have an amazing stay!<br><strong>Happy travels,</strong><br>The AirLite Team</p>
+  `;
+  return baseTemplate(content);
+};
+
 module.exports = {
   signupTemplate,
   verifyEmailTemplate,
@@ -476,4 +574,5 @@ module.exports = {
   refundInitiatedTemplate,
   refundSuccessfulTemplate,
   refundFailedTemplate,
+  reservationDetailsTemplate,
 };
