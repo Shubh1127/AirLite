@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
+import { useSearchStore } from '@/store/searchStore';
 import { listingsAPI } from '@/lib/listings';
 import { initiateRazorpayPayment } from '@/lib/razorpay';
 import { format } from 'date-fns';
@@ -16,26 +17,38 @@ export default function ReservePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isAuthenticated, token } = useAuthStore();
+  const searchStore = useSearchStore();
 
   const listingId = params.id as string;
-  const checkInDate = searchParams.get('checkIn');
-  const checkOutDate = searchParams.get('checkOut');
-  const adultsStr = searchParams.get('adults');
-  const childrenStr = searchParams.get('children');
-  const infantsStr = searchParams.get('infants');
-  const petsStr = searchParams.get('pets');
+  const checkInParam = searchParams.get('checkIn') || searchStore.checkInDate?.toISOString();
+  const checkOutParam = searchParams.get('checkOut') || searchStore.checkOutDate?.toISOString();
+  const adultsStr = searchParams.get('adults') || searchStore.guests.adults.toString();
+  const childrenStr = searchParams.get('children') || searchStore.guests.children.toString();
+  const infantsStr = searchParams.get('infants') || searchStore.guests.infants.toString();
+  const petsStr = searchParams.get('pets') || searchStore.guests.pets.toString();
 
   const [listing, setListing] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [guestMessage, setGuestMessage] = useState('');
+  const [guestMessage, setGuestMessage] = useState(searchStore.guestMessage || '');
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
 
+  const checkInDate = checkInParam;
+  const checkOutDate = checkOutParam;
   const adults = parseInt(adultsStr || '0');
   const children = parseInt(childrenStr || '0');
   const infants = parseInt(infantsStr || '0');
   const pets = parseInt(petsStr || '0');
   const totalGuests = adults + children;
+
+  // Save current state to store whenever it changes
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      searchStore.setReservationDetails({ guestMessage });
+    }, 300);
+    
+    return () => clearTimeout(timeoutId);
+  }, [guestMessage]);
 
   // Fetch listing details
   useEffect(() => {

@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { listingsAPI } from "@/lib/listings";
 import { wishlistAPI } from "@/lib/wishlist";
 import { useAuthStore } from "@/store/authStore";
+import { useSearchStore } from "@/store/searchStore";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import {
@@ -61,17 +62,50 @@ export default function ListingDetailPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const id = params.id as string;
+  
+  // Get store data
+  const searchStore = useSearchStore();
+  
   const [listing, setListing] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Initialize from URL params, fallback to store
   const [checkInDate, setCheckInDate] = useState<Date | undefined>(() => {
     const checkInParam = searchParams.get('checkIn');
-    return checkInParam ? new Date(checkInParam) : undefined;
+    if (checkInParam) return new Date(checkInParam);
+    return searchStore.checkInDate || undefined;
   });
-  const [checkOutDate, setCheckOutDate] = useState<Date | undefined>();
-  const [adults, setAdults] = useState(1);
-  const [children, setChildren] = useState(0);
-  const [infants, setInfants] = useState(0);
-  const [pets, setPets] = useState(0);
+  
+  const [checkOutDate, setCheckOutDate] = useState<Date | undefined>(() => {
+    const checkOutParam = searchParams.get('checkOut');
+    if (checkOutParam) return new Date(checkOutParam);
+    return searchStore.checkOutDate || undefined;
+  });
+  
+  const [adults, setAdults] = useState(() => {
+    const adultsParam = searchParams.get('adults');
+    if (adultsParam) return parseInt(adultsParam);
+    return searchStore.guests.adults || 1;
+  });
+  
+  const [children, setChildren] = useState(() => {
+    const childrenParam = searchParams.get('children');
+    if (childrenParam) return parseInt(childrenParam);
+    return searchStore.guests.children || 0;
+  });
+  
+  const [infants, setInfants] = useState(() => {
+    const infantsParam = searchParams.get('infants');
+    if (infantsParam) return parseInt(infantsParam);
+    return searchStore.guests.infants || 0;
+  });
+  
+  const [pets, setPets] = useState(() => {
+    const petsParam = searchParams.get('pets');
+    if (petsParam) return parseInt(petsParam);
+    return searchStore.guests.pets || 0;
+  });
+  
   const [showGuestsDropdown, setShowGuestsDropdown] = useState(false);
   const [bigImage, setBigImage] = useState<string | null>(null);
   const [showCheckInCalendar, setShowCheckInCalendar] = useState(false);
@@ -181,6 +215,19 @@ export default function ListingDetailPage() {
       setIsLoadingWishlist(false);
     }
   };
+
+  // Save search criteria to store whenever they change
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      searchStore.setSearchCriteria({
+        checkInDate: checkInDate || undefined,
+        checkOutDate: checkOutDate || undefined,
+        guests: { adults, children, infants, pets },
+      });
+    }, 300);
+    
+    return () => clearTimeout(timeoutId);
+  }, [checkInDate, checkOutDate, adults, children, infants, pets]);
 
   // Initialize Mapbox map
   useEffect(() => {

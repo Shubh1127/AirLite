@@ -28,6 +28,7 @@ import { format } from "date-fns";
 import { listingsAPI } from "@/lib/listings";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/store/authStore";
+import { useSearchStore } from "@/store/searchStore";
 import { wishlistAPI } from "@/lib/wishlist";
 
 interface Listing {
@@ -87,6 +88,7 @@ export default function Home() {
   } | null>(null);
   const [nearbyListings, setNearbyListings] = useState<Listing[]>([]);
   const [wishlistIds, setWishlistIds] = useState<string[]>([]);
+  const setSearchCriteria = useSearchStore((state) => state.setSearchCriteria);
 
   // Calculate distance between two coordinates using Haversine formula
   const calculateDistance = (
@@ -1039,6 +1041,8 @@ export default function Home() {
                     <ListingCardComponent
                       listing={listing}
                       checkInDate={date}
+                      guests={guests}
+                      location={searchQuery}
                       wishlistIds={wishlistIds}
                       onWishlistToggle={handleWishlistToggle}
                     />
@@ -1077,6 +1081,8 @@ export default function Home() {
                     <ListingCardComponent
                       listing={listing}
                       checkInDate={date}
+                      guests={guests}
+                      location={searchQuery}
                       wishlistIds={wishlistIds}
                       onWishlistToggle={handleWishlistToggle}
                     />
@@ -1094,16 +1100,21 @@ export default function Home() {
 function ListingCardComponent({
   listing,
   checkInDate,
+  guests,
+  location,
   wishlistIds,
   onWishlistToggle,
 }: {
   listing: Listing;
   checkInDate?: Date;
+  guests?: { adults: number; children: number; infants: number; pets: number };
+  location?: string;
   wishlistIds: string[];
   onWishlistToggle: (listingId: string, isInWishlist: boolean) => void;
 }) {
   const isFavorite = wishlistIds.includes(listing._id);
   const [isLoading, setIsLoading] = React.useState(false);
+  const setSearchCriteria = useSearchStore((state) => state.setSearchCriteria);
 
   const handleWishlistToggle = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -1117,10 +1128,33 @@ function ListingCardComponent({
     }
   };
 
+  const buildListingUrl = () => {
+    const params = new URLSearchParams();
+    if (checkInDate) params.set('checkIn', checkInDate.toISOString());
+    if (guests?.adults) params.set('adults', guests.adults.toString());
+    if (guests?.children) params.set('children', guests.children.toString());
+    if (guests?.infants) params.set('infants', guests.infants.toString());
+    if (guests?.pets) params.set('pets', guests.pets.toString());
+    
+    const queryString = params.toString();
+    return `/listings/${listing._id}${queryString ? `?${queryString}` : ''}`;
+  };
+
+  const handleNavigateToListing = () => {
+    if (checkInDate && guests) {
+      setSearchCriteria({
+        location: location || '',
+        checkInDate,
+        guests,
+      });
+    }
+  };
+
   return (
     <Link
-      href={`/listings/${listing._id}${checkInDate ? `?checkIn=${checkInDate.toISOString()}` : ""}`}
+      href={buildListingUrl()}
       className="block"
+      onClick={handleNavigateToListing}
     >
       <div className="group flex-shrink-0 w-full">
         <div className="relative aspect-square bg-neutral-200 overflow-hidden rounded-xl mb-3">
