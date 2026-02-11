@@ -73,13 +73,25 @@ export default function ListingDetailPage() {
   const [checkInDate, setCheckInDate] = useState<Date | undefined>(() => {
     const checkInParam = searchParams.get('checkIn');
     if (checkInParam) return new Date(checkInParam);
-    return searchStore.checkInDate || undefined;
+    // Convert string from persisted store to Date object
+    if (searchStore.checkInDate) {
+      return searchStore.checkInDate instanceof Date 
+        ? searchStore.checkInDate 
+        : new Date(searchStore.checkInDate);
+    }
+    return undefined;
   });
   
   const [checkOutDate, setCheckOutDate] = useState<Date | undefined>(() => {
     const checkOutParam = searchParams.get('checkOut');
     if (checkOutParam) return new Date(checkOutParam);
-    return searchStore.checkOutDate || undefined;
+    // Convert string from persisted store to Date object
+    if (searchStore.checkOutDate) {
+      return searchStore.checkOutDate instanceof Date 
+        ? searchStore.checkOutDate 
+        : new Date(searchStore.checkOutDate);
+    }
+    return undefined;
   });
   
   const [adults, setAdults] = useState(() => {
@@ -311,7 +323,11 @@ export default function ListingDetailPage() {
   // Calculate total nights and price
   const calculateNights = () => {
     if (checkInDate && checkOutDate) {
-      const diffTime = Math.abs(checkOutDate.getTime() - checkInDate.getTime());
+      // Ensure dates are Date objects
+      const checkIn = checkInDate instanceof Date ? checkInDate : new Date(checkInDate);
+      const checkOut = checkOutDate instanceof Date ? checkOutDate : new Date(checkOutDate);
+      
+      const diffTime = Math.abs(checkOut.getTime() - checkIn.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       return diffDays;
     }

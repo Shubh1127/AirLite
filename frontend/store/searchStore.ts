@@ -92,6 +92,28 @@ export const useSearchStore = create<SearchState>()(
         guests: state.guests,
         guestMessage: state.guestMessage,
       }),
+      // Custom storage to handle Date serialization
+      storage: {
+        getItem: (name) => {
+          const str = localStorage.getItem(name);
+          if (!str) return null;
+          const { state } = JSON.parse(str);
+          // Convert date strings back to Date objects
+          if (state.checkInDate) {
+            state.checkInDate = new Date(state.checkInDate);
+          }
+          if (state.checkOutDate) {
+            state.checkOutDate = new Date(state.checkOutDate);
+          }
+          return { state };
+        },
+        setItem: (name, value) => {
+          localStorage.setItem(name, JSON.stringify(value));
+        },
+        removeItem: (name) => {
+          localStorage.removeItem(name);
+        },
+      },
     }
   )
 );
