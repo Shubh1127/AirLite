@@ -137,18 +137,31 @@ export default function ChatPage() {
 
       const socket = socketRef.current;
       if (socket?.connected) {
-        await new Promise<void>((resolve, reject) => {
+        const sentMessage = await new Promise<ChatMessage>((resolve, reject) => {
           socket.emit(
             'send_message',
             { reservationId: conversation.reservationId, text },
-            (response: { status: 'ok' | 'error'; message?: string }) => {
+            (response: { status: 'ok' | 'error'; message?: ChatMessage; error?: string }) => {
               if (response.status === 'ok') {
-                resolve();
+                if (response.message) {
+                  resolve(response.message);
+                  return;
+                }
+
+                reject(new Error('Failed to send message'));
                 return;
               }
-              reject(new Error(response.message || 'Failed to send message'));
+              reject(new Error(response.error || 'Failed to send message'));
             },
           );
+        });
+
+        setMessages((prev) => {
+          if (prev.some((message) => message._id === sentMessage._id)) {
+            return prev;
+          }
+
+          return [...prev, sentMessage];
         });
       } else {
         const message = await chatAPI.sendMessage(conversation.reservationId, text);
