@@ -735,7 +735,11 @@ export default function ListingDetailPage() {
             {listing.hostDetails?.hostProfile?.about ||
               "A passionate host committed to providing great experiences."}
           </p>
-          <button className="w-full bg-neutral-100 text-neutral-900 px-6 py-3 rounded-lg font-semibold hover:bg-neutral-200">
+          <button
+            type="button"
+            onClick={() => router.push(`/chats/${id}`)}
+            className="w-full bg-neutral-100 text-neutral-900 px-6 py-3 rounded-lg font-semibold hover:bg-neutral-200"
+          >
             Message host
           </button>
         </div>
@@ -1632,7 +1636,11 @@ export default function ListingDetailPage() {
               </p>
             </div>
 
-            <button className="w-full md:w-auto bg-gray-100 text-[14px] text-gray-900 px-6 py-3 rounded-lg font-semibold hover:bg-gray-200 mb-6">
+            <button
+              type="button"
+              onClick={() => router.push(`/chats/${id}`)}
+              className="w-full md:w-auto bg-gray-100 text-[14px] text-gray-900 px-6 py-3 rounded-lg font-semibold hover:bg-gray-200 mb-6"
+            >
               Message host
             </button>
 

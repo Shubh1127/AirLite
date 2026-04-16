@@ -3,8 +3,10 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 const express = require("express");
+const http = require("http");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const { Server } = require("socket.io");
 
 // Debug: Log if SECRET is loaded
 console.log("SECRET loaded:", !!process.env.SECRET);
@@ -14,12 +16,16 @@ const reviewRoutes = require("./routes/reviews.route");
 const userRoutes = require("./routes/user.route");
 const paymentRoutes = require("./routes/payment.route");
 const wishlistRoutes = require("./routes/wishlist.route");
+const chatRoutes = require("./routes/chat.route");
 const webhookRoutes = require("./routes/webhook.route");
 
 const ExpressError = require("./utils/ExpressError.util");
 const { initializeScheduler } = require("./utils/scheduler.util");
+const { setIO } = require("./config/socket");
+const { initializeChatSocket } = require("./socket/chat.socket");
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 8080;
 
 /* =========================
@@ -62,6 +68,7 @@ app.use("/api/listings", listingRoutes);
 app.use("/api/listings/:id/reviews", reviewRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/wishlist", wishlistRoutes);
+app.use("/api/chat", chatRoutes);
 // Webhook route registered earlier (before express.json middleware)
 
 /* =========================
@@ -90,7 +97,21 @@ app.use((err, req, res, next) => {
 /* =========================
    SERVER START
 ========================= */
-app.listen(PORT, () => {
+const io = new Server(server, {
+  cors: {
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "https://air-lite.vercel.app",
+    ],
+    credentials: true,
+  },
+});
+
+setIO(io);
+initializeChatSocket(io);
+
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   
   // Initialize background scheduler for periodic tasks (e.g., refund status checks)
